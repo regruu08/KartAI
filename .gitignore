@@ -60,3 +60,5 @@ Thumbs.db
 
 # Hackathon extraction archive (local reference only)
 code_to_cart_hackathon/
+
+.gemini/
