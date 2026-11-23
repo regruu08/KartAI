@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: returnzero-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter
+    region: oregon
+    healthCheckPath: /healthz
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: ENVIRONMENT
+        value: production
+      - key: DEMO_MODE
+        value: "true"
+      - key: DEMO_RESET_TOKEN
+        value: secret-demo-token-2026
+      - key: PRIMARY_GEMINI_API_KEY
+        sync: false
+      - key: BACKUP_GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL_ID
+        value: gemini-3.8-flash
+      - key: CORS_ORIGINS
+        value: "http://localhost:3000,https://returnzero-ai.vercel.app,https://*.vercel.app"
