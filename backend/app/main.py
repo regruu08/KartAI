@@ -18,6 +18,9 @@ from pydantic import BaseModel
 from app.api.analytics import router as analytics_router
 from app.api.catalog import router as catalog_router
 from app.api.demo import router as demo_router
+from app.api.incentive import router as incentive_router
+from app.api.orders import router as orders_router
+from app.api.risk import router as risk_router
 from app.config import Settings, get_settings
 from app.db.seed import seed_initial_data
 from app.db.session import async_session_factory, engine, init_db
@@ -72,6 +75,9 @@ def create_app(custom_settings: Settings | None = None) -> FastAPI:
     app.include_router(catalog_router, prefix="/v1/catalog", tags=["Catalog"])
     app.include_router(analytics_router, prefix="/v1/analytics", tags=["Analytics"])
     app.include_router(demo_router, prefix="/v1/demo", tags=["Demo"])
+    app.include_router(risk_router, prefix="/v1/risk", tags=["Risk"])
+    app.include_router(incentive_router, prefix="/v1/incentive", tags=["Incentive"])
+    app.include_router(orders_router, prefix="/v1/orders", tags=["Orders"])
 
     @app.get(
         "/healthz",

@@ -11,8 +11,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
+from app.domain.sizing import recommend_size
 from app.schemas.api_contracts import (
     ExtractCatalogRequest,
+    FitRecommendationResponse,
+    FitRecommendRequest,
     SkuListResponse,
     SkuResponse,
 )
@@ -79,3 +82,43 @@ async def extract_sku(
             detail=f"SKU '{sku_id}' not found in catalog",
         )
     return sku
+
+
+@router.post(
+    "/skus/{sku_id}/fit",
+    response_model=FitRecommendationResponse,
+    summary="Compute deterministic size recommendation",
+    description="Calculates recommended size, confidence band, and fit zone breakdown using pure domain EOM rules.",
+    tags=["Catalog"],
+)
+async def compute_sku_fit(
+    sku_id: str,
+    request: FitRecommendRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> FitRecommendationResponse:
+    """Calculate sizing recommendation against SKU measurements."""
+    service = CatalogService(session)
+    sku = await service.get_sku(sku_id)
+    if not sku:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"SKU '{sku_id}' not found in catalog",
+        )
+    recommendation = recommend_size(
+        sku_id=sku_id,
+        known_brand=request.known_brand,
+        known_size=request.known_size,
+        fit_preference=request.fit_preference,
+        height_cm=request.height_cm,
+        chest_inches=request.chest_inches,
+        waist_inches=request.waist_inches,
+    )
+    return FitRecommendationResponse(
+        sku_id=recommendation.sku_id,
+        recommended_size=recommendation.recommended_size,
+        confidence_level=recommendation.confidence_level,
+        fit_score=recommendation.fit_score,
+        fit_zone_breakdown=recommendation.fit_zone_breakdown,
+        explanation_text=recommendation.explanation_text,
+        missing_data_warnings=recommendation.missing_data_warnings,
+    )

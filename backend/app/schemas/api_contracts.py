@@ -357,3 +357,218 @@ class DemoResetResponse(BaseModel):
     message: str = Field(description="Confirmation message")
     seeded_orders: int = Field(description="Count of seeded historical orders")
     seeded_skus: int = Field(description="Count of seeded product SKUs")
+
+
+# --- Sizing & Fit Schemas ---
+
+
+class FitRecommendRequest(BaseModel):
+    """Request payload for deterministic size recommendation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    known_brand: str = Field(description="Shopper reference brand: Zara | H&M | Uniqlo")
+    known_size: str = Field(description="Shopper reference size: XS, S, M, L, XL, XXL, 32, 34...")
+    fit_preference: str = Field(
+        default="tailored",
+        description="Fit preference: tight | tailored | regular | relaxed | oversized",
+    )
+    height_cm: float | None = Field(
+        default=None, ge=100.0, le=250.0, description="Shopper height in cm"
+    )
+    chest_inches: float | None = Field(
+        default=None, ge=20.0, le=70.0, description="Shopper chest circumference in inches"
+    )
+    waist_inches: float | None = Field(
+        default=None, ge=15.0, le=70.0, description="Shopper waist circumference in inches"
+    )
+
+
+class FitRecommendationResponse(BaseModel):
+    """Deterministic size recommendation response with transparent breakdown and gap warnings."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sku_id: str = Field(description="Target SKU identifier")
+    recommended_size: str = Field(description="Recommended size code")
+    confidence_level: str = Field(
+        description="Categorical confidence band: High | Medium | Low (Insufficient Data)"
+    )
+    fit_score: int = Field(description="Heuristic explainability index (0-100)")
+    fit_zone_breakdown: dict[str, Any] = Field(description="Breakdown per body zone")
+    explanation_text: str = Field(description="Human-readable transparent fit rationale")
+    missing_data_warnings: list[str] = Field(
+        default_factory=list, description="Missing measurement warnings"
+    )
+
+
+# --- Risk & Order Review Schemas ---
+
+
+class OrderReviewCheckItem(BaseModel):
+    """Single item in the 3-point order review checklist."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(description="Check identifier")
+    label: str = Field(description="Human readable check label")
+    status: str = Field(description="PASS | REVIEW | FAIL")
+
+
+class RiskEvaluateRequest(BaseModel):
+    """Request payload for order operational risk evaluation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    street_address: str = Field(min_length=3, description="Street address")
+    pin_code: str = Field(pattern=r"^\d{6}$", description="6-digit Indian PIN code")
+    payment_method: str = Field(default="COD", description="COD | Prepaid")
+    has_used_fit_twin: bool = Field(
+        default=True, description="Whether shopper completed fit sizing check"
+    )
+    is_bracketing: bool = Field(
+        default=False, description="Whether cart has multiple sizes of identical SKU"
+    )
+
+
+class RiskEvaluateResponse(BaseModel):
+    """Explainable risk evaluation result with 3-point checklist and guaranteed COD."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    risk_score_index: int = Field(ge=0, le=100, description="Composite risk index [0, 100]")
+    risk_level: str = Field(description="Low | Review | Elevated")
+    contributing_factors: list[str] = Field(description="Explainable factor details")
+    checks: list[OrderReviewCheckItem] = Field(description="3-point order review checklist")
+    cod_remains_available: bool = Field(
+        default=True, description="Guaranteed COD availability mandate"
+    )
+
+
+# --- Incentive Schemas ---
+
+
+class IncentiveQuoteRequest(BaseModel):
+    """Request payload for closed-form dynamic incentive quote."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    cart_total_inr: Decimal = Field(ge=Decimal("0.00"), description="Cart total in INR")
+    risk_score_index: int = Field(ge=0, le=100, description="Risk index from risk evaluator")
+    current_payment: str = Field(default="COD", description="COD | Prepaid")
+    has_used_fit_twin: bool = Field(default=True, description="Whether shopper completed fit check")
+    applied_coupon_discount_inr: Decimal = Field(
+        default=Decimal("0.00"), ge=Decimal("0.00"), description="Existing coupon discount"
+    )
+    doorstep_refusal_count: int = Field(default=0, ge=0, description="Past doorstep refusal count")
+    upi_gateway_fee_pct: Decimal = Field(
+        default=Decimal("0.00"),
+        ge=Decimal("0.00"),
+        le=Decimal("10.00"),
+        description="Gateway fee %",
+    )
+
+
+class IncentiveQuoteResponse(BaseModel):
+    """Closed-form margin-safe incentive quote with guaranteed COD."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    eligible_for_incentive: bool = Field(
+        description="Whether order qualifies for instant UPI discount"
+    )
+    recommended_discount_inr: Decimal = Field(description="Margin-safe discount amount in INR")
+    expected_savings_inr: Decimal = Field(description="Expected merchant loss avoided")
+    headroom_inr: Decimal = Field(description="Retained margin headroom after discount")
+    reason_code: str = Field(description="Decision reason code")
+    nudge_copy: str = Field(description="State-conditioned shopper nudge copy")
+    cod_remains_available: bool = Field(
+        default=True, description="Guaranteed COD availability mandate"
+    )
+
+
+# --- Order Transaction Schemas ---
+
+
+class OrderCreateRequest(BaseModel):
+    """Request payload for customer order creation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sku_id: str = Field(description="SKU identifier")
+    size: str = Field(description="Selected garment size")
+    quantity: int = Field(default=1, ge=1, le=10, description="Order quantity")
+    customer_name: str = Field(min_length=2, max_length=120, description="Customer name")
+    customer_phone: str = Field(min_length=10, max_length=20, description="Customer phone number")
+    street_address: str = Field(min_length=3, description="Delivery address")
+    city: str = Field(min_length=2, max_length=100, description="City")
+    state: str = Field(min_length=2, max_length=100, description="State")
+    pin_code: str = Field(pattern=r"^\d{6}$", description="6-digit Indian PIN code")
+    payment_method: str = Field(default="COD", description="COD | Prepaid")
+    applied_discount_inr: Decimal = Field(
+        default=Decimal("0.00"), ge=Decimal("0.00"), description="Discount applied"
+    )
+    incentive_reason_code: str | None = Field(default=None, description="Incentive reason code")
+    has_used_fit_twin: bool = Field(default=True, description="Fit check participation")
+    is_bracketing: bool = Field(default=False, description="Multiple sizes in cart flag")
+    known_brand: str | None = Field(default=None, description="Shopper reference brand")
+    known_size: str | None = Field(default=None, description="Shopper reference size")
+    fit_preference: str | None = Field(default=None, description="Shopper preference")
+
+
+class OrderResponse(BaseModel):
+    """Customer order details response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(description="Unique internal order ID")
+    order_number: str = Field(description="Merchant order reference")
+    customer_name: str = Field(description="Customer full name")
+    street_address: str = Field(description="Delivery address")
+    pin_code: str = Field(description="PIN code")
+    city: str = Field(description="City")
+    state: str = Field(description="State")
+    tier: str = Field(description="Geographic tier (Tier-1, Tier-2, Tier-3)")
+    payment_method: str = Field(description="COD or Prepaid")
+    total_inr: Decimal = Field(description="Total order value in INR")
+    discount_applied_inr: Decimal = Field(description="Applied discount in INR")
+    selected_size: str = Field(description="Purchased garment size")
+    sku_id: str = Field(description="SKU ID")
+    cod_risk_score: int = Field(description="Risk score index")
+    order_status: str = Field(description="Order lifecycle status")
+    address_status: str = Field(description="Address quality classification")
+    used_fit_check: bool = Field(description="Whether fit twin was used")
+    consent_status: str = Field(
+        description="WhatsApp delivery assurance consent status: opted_in | opted_out"
+    )
+    dispatch_priority: str = Field(description="Dispatch priority: standard | priority")
+    is_synthetic: bool = Field(description="Whether order is synthetic seeded data")
+    created_at: datetime = Field(description="Order creation timestamp")
+
+
+class OrderListResponse(BaseModel):
+    """Order listing response."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    orders: list[OrderResponse] = Field(description="List of orders")
+    total: int = Field(description="Total count of orders")
+
+
+class OrderVerifyRequest(BaseModel):
+    """Request payload for delivery assurance address/landmark verification."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    landmark: str | None = Field(default=None, description="Optional landmark provided by customer")
+    delivery_slot: str | None = Field(default=None, description="Preferred delivery time slot")
+    opt_in_whatsapp: bool = Field(default=True, description="WhatsApp delivery assurance opt-in")
+
+
+class OrderNdrRequest(BaseModel):
+    """Request payload for NDR delivery reschedule."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    reschedule_date: str = Field(description="Preferred reschedule date")
+    reschedule_slot: str = Field(description="Preferred reschedule delivery slot")
