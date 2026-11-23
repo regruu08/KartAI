@@ -219,7 +219,8 @@ class GeminiAdapter:
             response_schema=response_schema,
         )
 
-        # Step 2: Attempt Primary Key with Hard Timeout
+        # Step 2: Attempt Primary Key with Dynamic Timeout Budgeting
+        overall_t0 = time.monotonic()
         if primary_client:
             t0 = time.monotonic()
             try:
@@ -245,37 +246,50 @@ class GeminiAdapter:
                     latency_ms,
                 )
 
-        # Step 3: Attempt Backup Key Failover with Hard Timeout
+        # Step 3: Attempt Backup Key Failover with Remaining Time Budget
         if backup_client:
-            t0 = time.monotonic()
-            try:
-                response_text = await asyncio.wait_for(
-                    self._execute_sdk_call(backup_client, contents, config),
-                    timeout=self.timeout_s,
-                )
-                latency_ms = (time.monotonic() - t0) * 1000
-                self.circuit_breaker.record_success()
-                logger.info(
-                    "[GEMINI LIVE SUCCESS] tier=backup, model=%s, latency_ms=%.1f",
-                    self.model_id,
-                    latency_ms,
-                )
-                return response_text, "backup"
+            elapsed = time.monotonic() - overall_t0
+            remaining_budget = self.timeout_s - elapsed
+            if remaining_budget > 0.2:
+                t0 = time.monotonic()
+                try:
+                    response_text = await asyncio.wait_for(
+                        self._execute_sdk_call(backup_client, contents, config),
+                        timeout=remaining_budget,
+                    )
+                    latency_ms = (time.monotonic() - t0) * 1000
+                    self.circuit_breaker.record_success()
+                    logger.info(
+                        "[GEMINI LIVE SUCCESS] tier=backup, model=%s, latency_ms=%.1f",
+                        self.model_id,
+                        latency_ms,
+                    )
+                    return response_text, "backup"
 
-            except Exception as exc:
-                latency_ms = (time.monotonic() - t0) * 1000
-                self.circuit_breaker.record_failure()
+                except Exception as exc:
+                    latency_ms = (time.monotonic() - t0) * 1000
+                    self.circuit_breaker.record_failure()
+                    logger.warning(
+                        "[GEMINI BACKUP FAILED] model=%s, error=%s, latency_ms=%.1f. Breaker status: %d/%d.",
+                        self.model_id,
+                        type(exc).__name__,
+                        latency_ms,
+                        self.circuit_breaker.consecutive_failures,
+                        self.circuit_breaker.failure_threshold,
+                    )
+                    raise GeminiAPIException(
+                        f"Gemini primary and backup keys failed (latest error: {type(exc).__name__})"
+                    ) from exc
+            else:
                 logger.warning(
-                    "[GEMINI BACKUP FAILED] model=%s, error=%s, latency_ms=%.1f. Breaker status: %d/%d.",
-                    self.model_id,
-                    type(exc).__name__,
-                    latency_ms,
-                    self.circuit_breaker.consecutive_failures,
-                    self.circuit_breaker.failure_threshold,
+                    "[GEMINI BACKUP SKIPPED] Timeout budget exhausted (elapsed=%.2fs >= %.2fs)",
+                    elapsed,
+                    self.timeout_s,
                 )
+                self.circuit_breaker.record_failure()
                 raise GeminiAPIException(
-                    f"Gemini primary and backup keys failed (latest error: {type(exc).__name__})"
-                ) from exc
+                    f"Gemini timeout budget ({self.timeout_s}s) exhausted before backup attempt"
+                )
 
         # If primary failed and no backup was configured
         self.circuit_breaker.record_failure()

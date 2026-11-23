@@ -15,6 +15,7 @@ Reference: ADR-001, ADR-004, ADR-013, ADR-016.
 from __future__ import annotations
 
 import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -135,6 +136,96 @@ async def test_extractor_timeout_fixture_fallback_zero_500() -> None:
     assert result.silhouette == "structured_fitted"
     assert result.stretch_category == "non_stretch"
     assert len(result.measurements_table) == 4
+
+
+@pytest.mark.asyncio
+async def test_dual_key_dynamic_timeout_budgeting_prevents_latency_overrun() -> None:
+    """Verify that when both primary and backup keys simulate network latency (> timeout_s),
+    dynamic timeout budgeting prevents latency overrun: CatalogExtractor.extract finishes in
+    under timeout_s + 0.5s and cleanly falls back to the verified benchmark fixture (provenance='manual_fixture').
+    """
+    timeout_s = 0.5
+    settings = Settings(
+        PRIMARY_GEMINI_API_KEY=SecretStr("primary-hanging-key"),
+        BACKUP_GEMINI_API_KEY=SecretStr("backup-hanging-key"),
+        GEMINI_TIMEOUT_S=timeout_s,
+    )
+
+    async def hanging_call(*args: object, **kwargs: object) -> FakeResponse:
+        # Both keys simulate network delay greater than timeout_s
+        await asyncio.sleep(timeout_s + 2.0)
+        return FakeResponse("{}")
+
+    mock_primary = MagicMock()
+    mock_primary.aio.models.generate_content = AsyncMock(side_effect=hanging_call)
+    mock_backup = MagicMock()
+    mock_backup.aio.models.generate_content = AsyncMock(side_effect=hanging_call)
+
+    adapter = GeminiAdapter(
+        settings=settings,
+        primary_client=mock_primary,
+        backup_client=mock_backup,
+    )
+    cache = CatalogCache()
+    extractor = CatalogExtractor(adapter=adapter, cache=cache)
+
+    t0 = time.monotonic()
+    result = await extractor.extract("SKU-01", listing_text="Handcrafted silk kurta")
+    elapsed = time.monotonic() - t0
+
+    # Under dynamic timeout budgeting, total wall-clock time must strictly be < timeout_s + 0.5s
+    # (Without timeout budgeting, sequential 2 x timeout would take ~1.0s+ and exceed timeout_s + 0.5s)
+    assert elapsed < (timeout_s + 0.5), (
+        f"Elapsed {elapsed:.3f}s exceeded deadline {timeout_s + 0.5:.3f}s"
+    )
+    assert result.provenance == ProvenanceEnum.FIXTURE.value
+    assert result.provenance == "manual_fixture"
+    assert result.garment_type == "Handcrafted Chanderi Silk Anarkali Kurta"
+    # Verify backup client was not called because primary exhausted the operation timeout budget
+    assert not mock_backup.aio.models.generate_content.called
+
+
+@pytest.mark.asyncio
+async def test_dual_key_backup_hanging_respects_remaining_budget() -> None:
+    """Verify that when primary fails quickly (e.g. 429) but backup hangs,
+    backup timeout is budgeted to remaining time and finishes under timeout_s + 0.5s.
+    """
+    timeout_s = 0.5
+    settings = Settings(
+        PRIMARY_GEMINI_API_KEY=SecretStr("primary-429-key"),
+        BACKUP_GEMINI_API_KEY=SecretStr("backup-hanging-key"),
+        GEMINI_TIMEOUT_S=timeout_s,
+    )
+
+    # Primary fails fast with 429
+    mock_primary = make_mock_client(error=RuntimeError("ResourceExhausted: 429"))
+
+    # Backup hangs
+    async def hanging_backup(*args: object, **kwargs: object) -> FakeResponse:
+        await asyncio.sleep(timeout_s + 2.0)
+        return FakeResponse("{}")
+
+    mock_backup = MagicMock()
+    mock_backup.aio.models.generate_content = AsyncMock(side_effect=hanging_backup)
+
+    adapter = GeminiAdapter(
+        settings=settings,
+        primary_client=mock_primary,
+        backup_client=mock_backup,
+    )
+    cache = CatalogCache()
+    extractor = CatalogExtractor(adapter=adapter, cache=cache)
+
+    t0 = time.monotonic()
+    result = await extractor.extract("SKU-01", listing_text="Handcrafted silk kurta")
+    elapsed = time.monotonic() - t0
+
+    assert elapsed < (timeout_s + 0.5), (
+        f"Elapsed {elapsed:.3f}s exceeded deadline {timeout_s + 0.5:.3f}s"
+    )
+    assert result.provenance == ProvenanceEnum.FIXTURE.value
+    assert result.provenance == "manual_fixture"
+    assert mock_backup.aio.models.generate_content.called
 
 
 @pytest.mark.asyncio

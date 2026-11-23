@@ -118,8 +118,8 @@ async def test_dual_key_failover_on_primary_error() -> None:
 
 
 @pytest.mark.asyncio
-async def test_dual_key_failover_on_primary_timeout() -> None:
-    """Verify failover to backup key when primary exceeds hard 4.0s timeout."""
+async def test_dual_key_budget_exhaustion_on_primary_timeout() -> None:
+    """Verify backup call is skipped and GeminiAPIException raised when primary exhausts timeout budget."""
     settings = Settings(
         PRIMARY_GEMINI_API_KEY=SecretStr("primary-key-123"),
         BACKUP_GEMINI_API_KEY=SecretStr("backup-key-456"),
@@ -141,9 +141,11 @@ async def test_dual_key_failover_on_primary_timeout() -> None:
         backup_client=mock_backup,
     )
 
-    text, tier = await adapter.generate_content(contents=["Extract catalog"])
-    assert text == '{"recovered_by_backup": true}'
-    assert tier == "backup"
+    with pytest.raises(GeminiAPIException) as exc_info:
+        await adapter.generate_content(contents=["Extract catalog"])
+
+    assert "exhausted before backup attempt" in str(exc_info.value)
+    assert not mock_backup.aio.models.generate_content.called
 
 
 @pytest.mark.asyncio
