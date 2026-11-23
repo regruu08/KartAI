@@ -16,6 +16,7 @@ import type {
   OrderListResponse,
   OrderVerifyRequest,
   OrderNdrRequest,
+  ScenarioCalculationResponse,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -138,6 +139,12 @@ export const api = {
   /** GET /v1/analytics/overview */
   getAnalyticsOverview(): Promise<AnalyticsOverviewResponse> {
     return request<AnalyticsOverviewResponse>("/v1/analytics/overview");
+  },
+
+  /** GET /v1/analytics/scenario */
+  getScenario(params?: Record<string, string | number>): Promise<ScenarioCalculationResponse> {
+    const qs = params ? `?${new URLSearchParams(params as Record<string, string>).toString()}` : "";
+    return request<ScenarioCalculationResponse>(`/v1/analytics/scenario${qs}`);
   },
 
   /** POST /v1/demo/reset */

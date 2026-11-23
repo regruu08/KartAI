@@ -216,6 +216,34 @@ export interface OrderNdrRequest {
   reschedule_slot: string;
 }
 
+export interface ScenarioOutputsSchema {
+  baseline_cod_shipments: number;
+  baseline_prepaid_shipments: number;
+  baseline_cod_rto_shipments: number;
+  baseline_prepaid_rto_shipments: number;
+  baseline_total_rto_shipments: number;
+  baseline_rto_rate_pct: number;
+  converted_shipments: number;
+  new_cod_shipments: number;
+  new_prepaid_shipments: number;
+  new_cod_rto_shipments: number;
+  new_prepaid_rto_shipments: number;
+  new_total_rto_shipments: number;
+  new_rto_rate_pct: number;
+  avoided_rto_shipments: number;
+  gross_avoided_loss_inr: number | string;
+  total_incentives_paid_inr: number | string;
+  total_payment_fees_inr: number | string;
+  net_operating_savings_monthly_inr: number | string;
+  net_operating_savings_annual_inr: number | string;
+}
+
+export interface ScenarioCalculationResponse {
+  combined_case: ScenarioOutputsSchema;
+  conservative_conversion_only_case: ScenarioOutputsSchema;
+  disclaimer: string;
+}
+
 export type FitPreference = "tight" | "tailored" | "relaxed" | "oversized";
 export type BrandName = "Zara" | "H&M" | "Uniqlo";
 export type SizeLabel = "XS" | "S" | "M" | "L" | "XL" | "XXL";
