@@ -1,0 +1,62 @@
+# Environment and local configs
+.env*
+!.env.example
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+.venv/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Linting
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+coverage/
+.coverage
+.coverage.*
+htmlcov/
+*.lcov
+
+# Node & Frontend
+node_modules/
+.next/
+out/
+.vercel
+*.tsbuildinfo
+next-env.d.ts
+
+# OS & IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Hackathon extraction archive (local reference only)
+code_to_cart_hackathon/
