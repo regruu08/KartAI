@@ -1,0 +1,48 @@
+{
+  "garment_type": "Raw Indigo Denim Trucker Jacket",
+  "silhouette": "regular_straight",
+  "stretch_category": "non_stretch",
+  "stated_fabric": "99% Cotton / 1% Spandex, 320 GSM, rigid armholes",
+  "visible_closure": "Metal shank button placket",
+  "measurements_table": [
+    {
+      "size_label": "S",
+      "chest_inches": 40.0,
+      "waist_inches": 38.0,
+      "hip_inches": null,
+      "shoulder_inches": 17.0,
+      "length_inches": 25.0
+    },
+    {
+      "size_label": "M",
+      "chest_inches": 42.0,
+      "waist_inches": 40.0,
+      "hip_inches": null,
+      "shoulder_inches": 18.0,
+      "length_inches": 26.0
+    },
+    {
+      "size_label": "L",
+      "chest_inches": 44.0,
+      "waist_inches": 42.0,
+      "hip_inches": null,
+      "shoulder_inches": 19.0,
+      "length_inches": 27.0
+    },
+    {
+      "size_label": "XL",
+      "chest_inches": 46.0,
+      "waist_inches": 44.0,
+      "hip_inches": null,
+      "shoulder_inches": 20.0,
+      "length_inches": 28.0
+    }
+  ],
+  "missing_critical_data": [
+    "sleeve_length"
+  ],
+  "drape_notes": "Heavyweight rigid denim twill with structured silhouette and firm armhole seams. [Note: Sleeve length not specified by merchant; sizing calibrated via chest & shoulder circumference].",
+  "provenance": "manual_fixture",
+  "extracted_at": "2026-11-23T16:34:23.439769Z",
+  "prompt_version": "v1.0"
+}

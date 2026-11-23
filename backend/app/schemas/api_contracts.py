@@ -14,7 +14,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -102,6 +102,108 @@ class SkuListResponse(BaseModel):
 
     skus: list[SkuResponse] = Field(description="List of available catalog items")
     total: int = Field(description="Total SKU count")
+
+
+class GarmentMeasurements(BaseModel):
+    """Garment dimensions for a specific size label."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    size_label: str = Field(description="Size label, e.g. S, M, L, XL, 32, 34")
+    chest_inches: float | None = Field(
+        default=None, description="Chest/bust circumference in inches"
+    )
+    waist_inches: float | None = Field(default=None, description="Waist circumference in inches")
+    hip_inches: float | None = Field(default=None, description="Hip circumference in inches")
+    shoulder_inches: float | None = Field(default=None, description="Shoulder width in inches")
+    length_inches: float | None = Field(
+        default=None, description="Garment vertical length in inches"
+    )
+
+
+class ExtractedCatalogAttributes(BaseModel):
+    """Multimodal extracted catalog intelligence from Gemini VLM or benchmark fixture."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    garment_type: str = Field(description="e.g. Kurta, Shirt, Trucker Jacket, Maxi Dress")
+    silhouette: Literal[
+        "structured_fitted", "regular_straight", "relaxed_boxy", "fluid_oversized"
+    ] = Field(description="Garment structural silhouette")
+    stretch_category: Literal[
+        "non_stretch", "slight_stretch", "medium_stretch", "high_stretch", "unknown"
+    ] = Field(description="Fabric stretch classification")
+    stated_fabric: str | None = Field(
+        default=None, description="Fabric stated in listing text, e.g. 100% Chanderi Silk"
+    )
+    visible_closure: str | None = Field(
+        default=None, description="e.g. Button placket, side zipper, smocked elastic"
+    )
+    measurements_table: list[GarmentMeasurements] = Field(
+        default_factory=list, description="Array of size-wise garment dimensions"
+    )
+    missing_critical_data: list[str] = Field(
+        default_factory=list,
+        description="List of unstated physical attributes, e.g. ['sleeve_length']",
+    )
+    drape_notes: str = Field(
+        description="Objective observation of garment fall, stiffness, and drape"
+    )
+    provenance: str = Field(
+        default="live_gemini",
+        description="Extraction provenance: live_gemini | cached | manual_fixture",
+    )
+    extracted_at: datetime | None = Field(
+        default=None, description="UTC timestamp of extraction execution"
+    )
+    prompt_version: str | None = Field(
+        default=None, description="Version of extraction prompt used"
+    )
+
+
+class ExtractCatalogRequest(BaseModel):
+    """Optional payload for on-demand SKU attribute extraction."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    listing_text: str | None = Field(
+        default=None, description="Optional override listing title and description"
+    )
+    image_path: str | None = Field(
+        default=None, description="Optional local file path to product photo"
+    )
+    force_refresh: bool = Field(
+        default=False, description="Whether to bypass cache and force re-extraction"
+    )
+
+
+# --- Address Normalization Schemas ---
+
+
+class NormalizedAddressResult(BaseModel):
+    """Cleaned address, isolated landmark, and rider delivery instructions."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sanitized_address: str = Field(description="Standardized title-cased address string")
+    landmark: str | None = Field(default=None, description="Extracted and formatted landmark")
+    delivery_instructions: str = Field(
+        description="Actionable last-mile instructions for delivery rider"
+    )
+    confidence: str = Field(default="high", description="Normalization confidence: high | medium")
+    provenance: str = Field(
+        default="live_gemini",
+        description="Source provenance: live_gemini | deterministic_rule",
+    )
+
+
+class NormalizeAddressRequest(BaseModel):
+    """Request payload for conversational address cleansing."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    raw_address: str = Field(min_length=3, description="Raw customer address text")
+    landmark: str | None = Field(default=None, description="Optional customer-provided landmark")
 
 
 # --- Analytics Schemas ---

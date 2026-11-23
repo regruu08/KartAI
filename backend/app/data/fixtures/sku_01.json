@@ -1,0 +1,46 @@
+{
+  "garment_type": "Handcrafted Chanderi Silk Anarkali Kurta",
+  "silhouette": "structured_fitted",
+  "stretch_category": "non_stretch",
+  "stated_fabric": "100% Chanderi Silk, zero-stretch (0% elastane), structured bodice, 180 GSM",
+  "visible_closure": "Concealed side zipper",
+  "measurements_table": [
+    {
+      "size_label": "S",
+      "chest_inches": 36.0,
+      "waist_inches": 32.0,
+      "hip_inches": 40.0,
+      "shoulder_inches": 14.5,
+      "length_inches": 48.0
+    },
+    {
+      "size_label": "M",
+      "chest_inches": 38.0,
+      "waist_inches": 34.0,
+      "hip_inches": 42.0,
+      "shoulder_inches": 15.0,
+      "length_inches": 48.0
+    },
+    {
+      "size_label": "L",
+      "chest_inches": 40.0,
+      "waist_inches": 36.0,
+      "hip_inches": 44.0,
+      "shoulder_inches": 15.5,
+      "length_inches": 48.0
+    },
+    {
+      "size_label": "XL",
+      "chest_inches": 42.0,
+      "waist_inches": 38.0,
+      "hip_inches": 46.0,
+      "shoulder_inches": 16.0,
+      "length_inches": 48.0
+    }
+  ],
+  "missing_critical_data": [],
+  "drape_notes": "Crisp handloom Chanderi silk with rich sheen and structured flare. Zero elastane requires adequate chest ease.",
+  "provenance": "manual_fixture",
+  "extracted_at": "2026-11-23T16:34:23.420197Z",
+  "prompt_version": "v1.0"
+}

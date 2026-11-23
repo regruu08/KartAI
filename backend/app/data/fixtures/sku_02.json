@@ -1,0 +1,46 @@
+{
+  "garment_type": "Relaxed Mandarin Collar Linen Shirt",
+  "silhouette": "relaxed_boxy",
+  "stretch_category": "slight_stretch",
+  "stated_fabric": "70% Cotton / 30% Linen, slight natural give, relaxed drape, 160 GSM",
+  "visible_closure": "Front button placket",
+  "measurements_table": [
+    {
+      "size_label": "S",
+      "chest_inches": 38.0,
+      "waist_inches": 36.0,
+      "hip_inches": null,
+      "shoulder_inches": 16.5,
+      "length_inches": 28.0
+    },
+    {
+      "size_label": "M",
+      "chest_inches": 40.0,
+      "waist_inches": 38.0,
+      "hip_inches": null,
+      "shoulder_inches": 17.5,
+      "length_inches": 29.0
+    },
+    {
+      "size_label": "L",
+      "chest_inches": 42.0,
+      "waist_inches": 40.0,
+      "hip_inches": null,
+      "shoulder_inches": 18.5,
+      "length_inches": 30.0
+    },
+    {
+      "size_label": "XL",
+      "chest_inches": 44.0,
+      "waist_inches": 42.0,
+      "hip_inches": null,
+      "shoulder_inches": 19.5,
+      "length_inches": 31.0
+    }
+  ],
+  "missing_critical_data": [],
+  "drape_notes": "Lightweight breathable linen blend with relaxed airy fall and gentle natural drape.",
+  "provenance": "manual_fixture",
+  "extracted_at": "2026-11-23T16:34:23.437678Z",
+  "prompt_version": "v1.0"
+}

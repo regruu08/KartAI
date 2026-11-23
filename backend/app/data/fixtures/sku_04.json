@@ -1,0 +1,46 @@
+{
+  "garment_type": "Flowy Floral Rayon Tiered Maxi Dress",
+  "silhouette": "fluid_oversized",
+  "stretch_category": "slight_stretch",
+  "stated_fabric": "100% Viscose Rayon, highly fluid drape, elasticated smocked waist",
+  "visible_closure": "Pullover with smocked elastic waist",
+  "measurements_table": [
+    {
+      "size_label": "S",
+      "chest_inches": 34.0,
+      "waist_inches": 26.0,
+      "hip_inches": null,
+      "shoulder_inches": 14.0,
+      "length_inches": 52.0
+    },
+    {
+      "size_label": "M",
+      "chest_inches": 36.0,
+      "waist_inches": 28.0,
+      "hip_inches": null,
+      "shoulder_inches": 15.0,
+      "length_inches": 53.0
+    },
+    {
+      "size_label": "L",
+      "chest_inches": 38.0,
+      "waist_inches": 30.0,
+      "hip_inches": null,
+      "shoulder_inches": 16.0,
+      "length_inches": 54.0
+    },
+    {
+      "size_label": "XL",
+      "chest_inches": 40.0,
+      "waist_inches": 32.0,
+      "hip_inches": null,
+      "shoulder_inches": 17.0,
+      "length_inches": 55.0
+    }
+  ],
+  "missing_critical_data": [],
+  "drape_notes": "Soft fluid viscose rayon cascading into tiered ruffles with flexible smocked waistband.",
+  "provenance": "manual_fixture",
+  "extracted_at": "2026-11-23T16:34:23.441463Z",
+  "prompt_version": "v1.0"
+}

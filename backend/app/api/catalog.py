@@ -11,7 +11,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
-from app.schemas.api_contracts import SkuListResponse, SkuResponse
+from app.schemas.api_contracts import (
+    ExtractCatalogRequest,
+    SkuListResponse,
+    SkuResponse,
+)
 from app.services.catalog_service import CatalogService
 
 router = APIRouter()
@@ -46,6 +50,29 @@ async def get_sku(
     """Retrieve single SKU by ID or 404."""
     service = CatalogService(session)
     sku = await service.get_sku(sku_id)
+    if not sku:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"SKU '{sku_id}' not found in catalog",
+        )
+    return sku
+
+
+@router.post(
+    "/skus/{sku_id}/extract",
+    response_model=SkuResponse,
+    summary="Extract SKU attributes via multimodal VLM",
+    description="Run 3-tier extraction flow (cache -> live Gemini -> fixture), persist attributes, and return updated SKU.",
+    tags=["Catalog"],
+)
+async def extract_sku(
+    sku_id: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    request: ExtractCatalogRequest | None = None,
+) -> SkuResponse:
+    """Run multimodal extraction for a given SKU and synchronize database state."""
+    service = CatalogService(session)
+    sku = await service.extract_and_update(sku_id, request)
     if not sku:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
