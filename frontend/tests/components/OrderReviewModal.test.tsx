@@ -60,4 +60,53 @@ describe("OrderReviewModal Component", () => {
     fireEvent.click(upiButton);
     expect(handleAcceptUpi).toHaveBeenCalled();
   });
+
+  it("returns null when isOpen is false", () => {
+    const { container } = render(
+      <OrderReviewModal
+        isOpen={false}
+        onClose={vi.fn()}
+        riskData={mockRisk}
+        incentiveData={mockIncentive}
+        cartTotal={1899}
+        onConfirmCod={vi.fn()}
+        onAcceptUpi={vi.fn()}
+      />,
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it("handles ineligible incentive gracefully with COD remaining available", () => {
+    const handleConfirmCod = vi.fn();
+    const ineligibleIncentive: IncentiveQuoteResponse = {
+      eligible_for_incentive: false,
+      recommended_discount_inr: 0,
+      expected_savings_inr: 0,
+      headroom_inr: 0,
+      reason_code: "REASON_INSUFFICIENT_MARGIN",
+      nudge_copy: "Order safety verified. Ready for dispatch.",
+      cod_remains_available: true,
+    };
+
+    render(
+      <OrderReviewModal
+        isOpen={true}
+        onClose={vi.fn()}
+        riskData={mockRisk}
+        incentiveData={ineligibleIncentive}
+        cartTotal={1499}
+        onConfirmCod={handleConfirmCod}
+        onAcceptUpi={vi.fn()}
+      />,
+    );
+
+    // No UPI discount button rendered
+    expect(screen.queryByText(/via Instant UPI/i)).toBeNull();
+
+    // COD button remains present and clickable
+    const codButton = screen.getByText(/Continue with Cash on Delivery/i);
+    expect(codButton).toBeInTheDocument();
+    fireEvent.click(codButton);
+    expect(handleConfirmCod).toHaveBeenCalled();
+  });
 });
