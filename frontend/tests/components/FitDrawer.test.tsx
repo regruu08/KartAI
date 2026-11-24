@@ -22,13 +22,16 @@ const mockSku: SkuResponse = {
   has_shoulder: true,
   has_sleeve: true,
   length_inches: 48,
-  sizes: [
-    { size: "S", chest: 36, waist: 32, hip: 38, shoulder: 14.5, length: 48, inventory_count: 5 },
-    { size: "M", chest: 38, waist: 34, hip: 40, shoulder: 15.5, length: 48, inventory_count: 8 },
-    { size: "L", chest: 42, waist: 38, hip: 44, shoulder: 17.5, length: 49, inventory_count: 12 },
-  ],
+  sizes_json: {
+    S: { chest: 36, waist: 32, hip: 38, shoulder: 14.5, length: 48 },
+    M: { chest: 38, waist: 34, hip: 40, shoulder: 15.5, length: 48 },
+    L: { chest: 42, waist: 38, hip: 44, shoulder: 17.5, length: 49 },
+  },
   care_instructions: "Dry clean only",
   provenance: "manual_fixture",
+  extracted_at: null,
+  prompt_version: null,
+  image_sha256: null,
 };
 
 const mockFitResponse: FitRecommendationResponse = {
@@ -107,8 +110,8 @@ describe("FitDrawer Component", () => {
     // Verify item in cart and drawer closed
     const cart = useStore.getState().cart;
     expect(cart.length).toBe(1);
-    expect(cart[0].size).toBe("L");
-    expect(cart[0].fitVerified).toBe(true);
+    expect(cart[0]?.size).toBe("L");
+    expect(cart[0]?.fitVerified).toBe(true);
     expect(useStore.getState().fitDrawerOpen).toBe(false);
   });
 
