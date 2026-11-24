@@ -24,11 +24,11 @@ Open on the ReturnZero Storefront (`/`). Smooth scroll across the 4 curated fash
 **Visual:**
 Click on **SKU-01 (Handcrafted Chanderi Silk Kurta)**. Click **"Check My Fit"**.
 Select **Zara → Size M → Regular fit → 165 cm**. Click **"Analyze Sizing"**.
-Show the recommended **Size M**, **High Confidence**, and the zone-by-zone ease breakdown (+2.0" chest ease).
+Show the recommended **Size L** (demonstrating how non-stretch silk prevents sizing down to M), **High Confidence**, and the zone-by-zone ease breakdown (+4.0" chest ease, +0.5" shoulder ease, with an explicit note explaining that Size M was eliminated because shoulder ease -1.5" is below the 0.0" minimum for non-stretch fabric).
 Click on **SKU-03 (Raw Indigo Denim Trucker)**. Expand the **"Catalog Intelligence"** accordion to reveal the ⚠ **"Merchant Data Gaps Detected (Missing Sleeve Length)"** alert and how the confidence band drops to **Medium**.
 
 **Spoken Audio:**
-> "First: **Fit Intelligence**. No invasive body photos. A shopper selects their trusted brand—like Zara Size M. Our pure Ease-Over-Measurement engine compares garment pattern specs against fabric elasticity, recommending Size M with transparent zone-by-zone ease.
+> "First: **Fit Intelligence**. No invasive body photos. A shopper selects their trusted brand—like Zara Size M. Our pure Ease-Over-Measurement engine compares garment pattern specs against fabric elasticity, recommending Size L with transparent zone-by-zone ease—demonstrating how rigid silk eliminates Size M before dispatch.
 > 
 > When merchants omit critical measurements—like missing sleeve length on this raw denim trucker—ReturnZero never hallucinates. It explicitly audits the data gap and penalizes confidence to protect the shopper."
 
@@ -37,7 +37,7 @@ Click on **SKU-03 (Raw Indigo Denim Trucker)**. Expand the **"Catalog Intelligen
 ### Segment 3: Checkout Shield & Closed-Form Incentive (0:50 – 1:15 | 25s)
 
 **Visual:**
-Add Size M to cart. Go to **`/checkout`**.
+Add recommended Size L to cart. Go to **`/checkout`**.
 Notice the multi-size bracketing warning if multiple sizes are chosen.
 Enter Delhi address with PIN `110001`. Select **Cash on Delivery (COD)**.
 Click **"Review Order Safety & Place"**.

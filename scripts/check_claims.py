@@ -11,6 +11,7 @@ Exits with:
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -118,9 +119,12 @@ def main() -> int:
     for target_dir in TARGET_DIRECTORIES:
         dir_path = repo_root / target_dir
         if dir_path.is_dir():
-            for p in dir_path.rglob("*"):
-                if p.is_file() and not should_skip_file(p):
-                    files_to_scan.append(p)
+            for root, dirs, files in os.walk(dir_path):
+                dirs[:] = [d for d in dirs if d not in SKIPPED_DIR_NAMES]
+                for f in files:
+                    p = Path(root) / f
+                    if not should_skip_file(p):
+                        files_to_scan.append(p)
 
     for target_file in TARGET_FILES:
         file_path = repo_root / target_file
