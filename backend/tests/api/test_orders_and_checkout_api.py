@@ -217,4 +217,3 @@ async def test_verify_order_persists_clarified_landmark_in_delivery_event(
     assert verify_res.status_code == 200
     assert exact_landmark in verify_res.json()["street_address"]
     assert verify_res.json()["address_status"] == "Complete"
-

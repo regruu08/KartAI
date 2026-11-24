@@ -155,12 +155,11 @@ class GeminiAdapter:
     ) -> str:
         """Invoke SDK models.generate_content using native async or threadpool."""
         if hasattr(client, "aio") and hasattr(client.aio, "models"):
-            fn = client.aio.models.generate_content
-            maybe_coro = fn(model=self.model_id, contents=contents, config=config)
-            if asyncio.iscoroutine(maybe_coro):
-                response = await maybe_coro
-            else:
-                response = maybe_coro
+            response = await client.aio.models.generate_content(
+                model=self.model_id,
+                contents=contents,
+                config=config,
+            )
         else:
             # Synchronous client wrapper (ADR-016)
             response = await run_in_threadpool(

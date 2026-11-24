@@ -4,10 +4,11 @@ Verifies golden fit conversions for all curated SKUs, EOM rules, preference-base
 missing sleeve notes, and dynamic confidence bands per ADR-004 and AGENTS.md §6.4.
 """
 
+import pytest
+
 from app.domain.sizing import (
     recommend_size,
 )
-import pytest
 
 
 class TestSizingGoldenCases:
@@ -35,9 +36,7 @@ class TestSizingGoldenCases:
         assert rec.fit_zone_breakdown["shoulder"]["shopper_inches"] == 17.0
 
         # Rigid fabric elimination note from data (A3)
-        expected_note = (
-            'Size M eliminated: shoulder ease -1.5" is below the 0.0" minimum for non-stretch fabric.'
-        )
+        expected_note = 'Size M eliminated: shoulder ease -1.5" is below the 0.0" minimum for non-stretch fabric.'
         assert expected_note in rec.explanation_text
         assert "shoulders" in rec.fit_zone_breakdown
         assert rec.fit_zone_breakdown["shoulders"]["note"] == expected_note

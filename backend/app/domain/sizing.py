@@ -366,9 +366,7 @@ def recommend_size(
     if eliminated_rigid_sizes:
         # Focus on explaining the shopper's reference size if eliminated, or all eliminated sizes
         known_sz_upper = known_size.upper()
-        focus_eliminated = [
-            item for item in eliminated_rigid_sizes if item[0] == known_sz_upper
-        ]
+        focus_eliminated = [item for item in eliminated_rigid_sizes if item[0] == known_sz_upper]
         items_to_report = focus_eliminated if focus_eliminated else eliminated_rigid_sizes
         notes = [
             f'Size {sz} eliminated: shoulder ease {ease:+.1f}" is below the {floor:.1f}" minimum for non-stretch fabric.'

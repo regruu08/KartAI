@@ -194,7 +194,8 @@ async def test_circuit_breaker_trips_after_three_failures() -> None:
             await adapter.generate_content(contents=["ping"])
         assert breaker.consecutive_failures == i
 
-    assert breaker.is_open is True
+    is_open_tripped = breaker.is_open
+    assert is_open_tripped is True
 
     # 4th call should immediately raise CircuitBreakerOpenException without invoking client
     call_count_before = mock_client.aio.models.generate_content.call_count
@@ -207,7 +208,8 @@ async def test_circuit_breaker_trips_after_three_failures() -> None:
 
     # Verify manual reset works
     breaker.reset()
-    assert breaker.is_open is False
+    is_open_after_reset = breaker.is_open
+    assert is_open_after_reset is False
     assert breaker.consecutive_failures == 0
 
 
