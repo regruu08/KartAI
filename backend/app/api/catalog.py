@@ -87,8 +87,9 @@ async def extract_sku(
 @router.post(
     "/skus/{sku_id}/fit",
     response_model=FitRecommendationResponse,
-    summary="Compute deterministic size recommendation",
-    description="Calculates recommended size, confidence band, and fit zone breakdown using pure domain EOM rules.",
+    summary="Compute deterministic size recommendation (Deprecated)",
+    description="Deprecated in favor of canonical POST /v1/fit/recommend per AGENTS.md §7.",
+    deprecated=True,
     tags=["Catalog"],
 )
 async def compute_sku_fit(

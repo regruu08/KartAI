@@ -67,14 +67,14 @@ export const api = {
     );
   },
 
-  /** POST /v1/catalog/skus/:id/fit */
+  /** POST /v1/fit/recommend (Canonical route per AGENTS.md §7) */
   computeFit(
     skuId: string,
     payload: FitRecommendRequest,
   ): Promise<FitRecommendationResponse> {
-    return request<FitRecommendationResponse>(`/v1/catalog/skus/${skuId}/fit`, {
+    return request<FitRecommendationResponse>("/v1/fit/recommend", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ ...payload, sku_id: skuId }),
     });
   },
 

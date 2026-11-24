@@ -367,6 +367,7 @@ class FitRecommendRequest(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+    sku_id: str = Field(default="", description="Target catalog SKU identifier, e.g. SKU-01")
     known_brand: str = Field(description="Shopper reference brand: Zara | H&M | Uniqlo")
     known_size: str = Field(description="Shopper reference size: XS, S, M, L, XL, XXL, 32, 34...")
     fit_preference: str = Field(

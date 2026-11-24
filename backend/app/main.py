@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from app.api.analytics import router as analytics_router
 from app.api.catalog import router as catalog_router
 from app.api.demo import router as demo_router
+from app.api.fit import router as fit_router
 from app.api.incentive import router as incentive_router
 from app.api.orders import router as orders_router
 from app.api.risk import router as risk_router
@@ -73,6 +74,7 @@ def create_app(custom_settings: Settings | None = None) -> FastAPI:
 
     # Canonical API Routers
     app.include_router(catalog_router, prefix="/v1/catalog", tags=["Catalog"])
+    app.include_router(fit_router, prefix="/v1/fit", tags=["Fit"])
     app.include_router(analytics_router, prefix="/v1/analytics", tags=["Analytics"])
     app.include_router(demo_router, prefix="/v1/demo", tags=["Demo"])
     app.include_router(risk_router, prefix="/v1/risk", tags=["Risk"])

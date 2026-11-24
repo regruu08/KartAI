@@ -40,6 +40,7 @@ export interface FitZoneDetail {
 }
 
 export interface FitRecommendRequest {
+  sku_id?: string;
   known_brand: string;
   known_size: string;
   fit_preference?: string;
