@@ -277,6 +277,7 @@ def recommend_size(
 
     penalties: dict[str, float] = {}
     breakdowns: dict[str, dict[str, Any]] = {}
+    eliminated_rigid_sizes: list[tuple[str, float, float]] = []
 
     for size_label, dims in sku["sizes"].items():
         g_chest = dims.get("chest", 0.0)
@@ -290,6 +291,12 @@ def recommend_size(
         if chest_ease < hard_floor_chest or (
             has_shoulder_dims and shoulder_ease < hard_floor_shoulder
         ):
+            if (
+                has_shoulder_dims
+                and shoulder_ease < hard_floor_shoulder
+                and stretch == "non_stretch"
+            ):
+                eliminated_rigid_sizes.append((size_label, shoulder_ease, hard_floor_shoulder))
             continue
 
         # Penalties: chest ease deviation + shoulder ease deviation + waist ease deviation
@@ -354,6 +361,21 @@ def recommend_size(
 
         breakdowns[size_label] = zone_bd
 
+    # Generate rigid-fabric shoulder note from data (ADR-004 / A3)
+    rigid_fabric_note: str | None = None
+    if eliminated_rigid_sizes:
+        # Focus on explaining the shopper's reference size if eliminated, or all eliminated sizes
+        known_sz_upper = known_size.upper()
+        focus_eliminated = [
+            item for item in eliminated_rigid_sizes if item[0] == known_sz_upper
+        ]
+        items_to_report = focus_eliminated if focus_eliminated else eliminated_rigid_sizes
+        notes = [
+            f'Size {sz} eliminated: shoulder ease {ease:+.1f}" is below the {floor:.1f}" minimum for non-stretch fabric.'
+            for sz, ease, floor in items_to_report
+        ]
+        rigid_fabric_note = " ".join(notes)
+
     # 4. Determine recommendation
     if penalties:
         # Sort sizes by lowest penalty
@@ -369,21 +391,45 @@ def recommend_size(
             "overall": "Maximum available size recommended (garment pattern runs small)"
         }
 
-    # 5. Dynamic Categorical Confidence Calculation (ADR-004)
+    # Attach rigid fabric note to breakdowns for explainability
+    if rigid_fabric_note and best_size in breakdowns:
+        breakdowns[best_size]["shoulders"] = {"note": rigid_fabric_note}
+
+    # 5. Dynamic Categorical Confidence Calculation with explicit data-gap caps (ADR-004 / A3)
+    confidence_scale = ["Low (Insufficient Data)", "Medium", "High"]
+
+    def _min_band(band_a: str, band_b: str) -> str:
+        idx_a = confidence_scale.index(band_a) if band_a in confidence_scale else 0
+        idx_b = confidence_scale.index(band_b) if band_b in confidence_scale else 0
+        return confidence_scale[min(idx_a, idx_b)]
+
+    if best_penalty <= 2.5:
+        base_confidence = "High"
+    elif best_penalty <= 4.5:
+        base_confidence = "Medium"
+    else:
+        base_confidence = "Low (Insufficient Data)"
+
+    # Formulate list of data-gap caps
+    gap_caps: list[str] = []
+    if not brand_recognized:
+        gap_caps.append("Medium")
+    if not has_shoulder_dims:
+        gap_caps.append("Medium")
+    if not has_sleeve_dims:
+        gap_caps.append("Medium")
+    if stretch == "unknown":
+        gap_caps.append("Medium")
     if (
-        not brand_recognized
-        or not has_shoulder_dims
-        or runner_up_penalty is not None
+        runner_up_penalty is not None
         and (runner_up_penalty - best_penalty) < 0.25
         and stretch == "non_stretch"
     ):
-        confidence = "Medium"
-    elif best_penalty <= 2.5:
-        confidence = "High"
-    elif best_penalty <= 4.5:
-        confidence = "Medium"
-    else:
-        confidence = "Low (Insufficient Data)"
+        gap_caps.append("Medium")
+
+    confidence = base_confidence
+    for cap in gap_caps:
+        confidence = _min_band(confidence, cap)
 
     # Heuristic fit score in [50, 95] for explainability
     fit_score = max(50, min(95, int(95 - (best_penalty * 8))))
@@ -394,6 +440,8 @@ def recommend_size(
         f"Based on your {known_brand} Size {known_size.upper()}, we recommend Size {best_size} "
         f"in this {garment_title} for a {normalized_pref} fit in {stretch.replace('_', ' ')} fabric."
     )
+    if rigid_fabric_note:
+        explanation += f" {rigid_fabric_note}"
     if height_note:
         explanation += f" {height_note}"
 

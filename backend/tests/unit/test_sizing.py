@@ -7,6 +7,7 @@ missing sleeve notes, and dynamic confidence bands per ADR-004 and AGENTS.md §6
 from app.domain.sizing import (
     recommend_size,
 )
+import pytest
 
 
 class TestSizingGoldenCases:
@@ -33,6 +34,14 @@ class TestSizingGoldenCases:
         assert rec.fit_zone_breakdown["shoulder"]["garment_inches"] == 17.0
         assert rec.fit_zone_breakdown["shoulder"]["shopper_inches"] == 17.0
 
+        # Rigid fabric elimination note from data (A3)
+        expected_note = (
+            'Size M eliminated: shoulder ease -1.5" is below the 0.0" minimum for non-stretch fabric.'
+        )
+        assert expected_note in rec.explanation_text
+        assert "shoulders" in rec.fit_zone_breakdown
+        assert rec.fit_zone_breakdown["shoulders"]["note"] == expected_note
+
     def test_hm_m_linen_shirt_slight_stretch_recommends_size_m(self) -> None:
         """H&M M (Chest 38.0, Shoulder 16.8) on Linen Shirt (slight-stretch) must yield Size M."""
         rec = recommend_size(
@@ -52,6 +61,26 @@ class TestSizingGoldenCases:
             known_brand="Uniqlo",
             known_size="M",
             fit_preference="regular",
+        )
+        assert any(
+            "Sleeve length not specified by merchant" in w for w in rec.missing_data_warnings
+        )
+
+    @pytest.mark.parametrize("pref", ["tight", "tailored", "relaxed", "oversized"])
+    @pytest.mark.parametrize("brand", ["Zara", "H&M", "Uniqlo"])
+    @pytest.mark.parametrize("size", ["S", "M", "L"])
+    def test_denim_jacket_missing_sleeve_never_exceeds_medium_confidence(
+        self, pref: str, brand: str, size: str
+    ) -> None:
+        """Parametrized verification that SKU-03 never evaluates to 'High' confidence."""
+        rec = recommend_size(
+            sku_id="SKU-03",
+            known_brand=brand,
+            known_size=size,
+            fit_preference=pref,
+        )
+        assert rec.confidence_level in ("Medium", "Low (Insufficient Data)"), (
+            f"Expected <= Medium, got {rec.confidence_level} for {brand} {size} {pref}"
         )
         assert any(
             "Sleeve length not specified by merchant" in w for w in rec.missing_data_warnings
