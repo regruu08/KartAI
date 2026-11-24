@@ -104,6 +104,7 @@ export default function ProductDetailPage() {
   const skuId = rawId.toUpperCase();
 
   const [sku, setSku] = useState<SkuResponse | null>(null);
+  const [notFound, setNotFound] = useState(false);
   const [selectedSize, setSelectedSize] = useState<string>("M");
   const [addedToast, setAddedToast] = useState(false);
   const [bracketingWarning, setBracketingWarning] = useState(false);
@@ -111,13 +112,22 @@ export default function ProductDetailPage() {
   const { openFitDrawer, fitResult, cart, addToCart } = useStore();
 
   useEffect(() => {
-    // Attempt backend fetch with fallback
+    setNotFound(false);
     api
       .getSku(skuId)
-      .then((data) => setSku(data))
+      .then((data) => {
+        setSku(data);
+        setNotFound(false);
+      })
       .catch(() => {
-        const fallback = CURATED_DETAILS[skuId] ?? CURATED_DETAILS["SKU-01"];
-        setSku(fallback as SkuResponse);
+        // Only fall back if it is one of the known curated SKUs
+        if (CURATED_DETAILS[skuId]) {
+          setSku(CURATED_DETAILS[skuId] as SkuResponse);
+          setNotFound(false);
+        } else {
+          setNotFound(true);
+          setSku(null);
+        }
       });
   }, [skuId]);
 
@@ -127,6 +137,32 @@ export default function ProductDetailPage() {
       setSelectedSize(fitResult.recommended_size);
     }
   }, [fitResult]);
+
+  if (notFound) {
+    return (
+      <div className="min-h-screen bg-canvas text-ink flex flex-col">
+        <Navbar />
+        <main className="max-w-4xl mx-auto px-4 py-16 flex-1 flex flex-col items-center justify-center text-center">
+          <div className="p-4 bg-brand/10 text-brand rounded-full mb-4">
+            <AlertCircle className="w-8 h-8" />
+          </div>
+          <h1 className="text-2xl font-bold text-ink mb-2">Product Not Found</h1>
+          <p className="text-sm text-inkMuted max-w-md mb-6">
+            We could not find the garment catalog entry for{" "}
+            <span className="font-mono font-bold text-ink">{skuId}</span>. It may
+            have been retired or does not exist.
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brandHover transition-colors shadow-sm"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Storefront
+          </Link>
+        </main>
+      </div>
+    );
+  }
 
   if (!sku) {
     return (

@@ -103,6 +103,11 @@ async def create_order(
 
     item_price = sku.price_inr
     subtotal = item_price * request.quantity
+    if request.applied_discount_inr > subtotal:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Applied discount cannot exceed order subtotal.",
+        )
     total_inr = max(Decimal("0.00"), subtotal - request.applied_discount_inr)
     dispatch_priority = "priority" if request.payment_method.upper() == "PREPAID" else "standard"
 
@@ -279,10 +284,16 @@ async def verify_order(
             raw_address=order.street_address,
             landmark=clean_landmark,
         )
-        if norm_result.landmark:
-            order.street_address = f"{norm_result.sanitized_address}, Near {norm_result.landmark}"
-        else:
-            order.street_address = norm_result.sanitized_address
+        sanitized = norm_result.sanitized_address.strip()
+        # Prevent redundant concatenation if landmark is already incorporated
+        if (
+            norm_result.landmark
+            and norm_result.landmark.lower() not in sanitized.lower()
+            and clean_landmark.lower() not in sanitized.lower()
+        ):
+            prefix = "" if norm_result.landmark.lower().startswith(("near", "opp", "opposite", "behind", "beside")) else "Near "
+            sanitized = f"{sanitized}, {prefix}{norm_result.landmark}"
+        order.street_address = sanitized
         order.address_status = "Complete"
 
     order.order_status = "Safe_For_Dispatch"

@@ -16,7 +16,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # --- Status Enums ---
 
@@ -376,8 +376,12 @@ class FitRecommendRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     sku_id: str = Field(default="", description="Target catalog SKU identifier, e.g. SKU-01")
-    known_brand: str = Field(description="Shopper reference brand: Zara | H&M | Uniqlo")
-    known_size: str = Field(description="Shopper reference size: XS, S, M, L, XL, XXL, 32, 34...")
+    known_brand: str = Field(
+        min_length=1, description="Shopper reference brand: Zara | H&M | Uniqlo"
+    )
+    known_size: str = Field(
+        min_length=1, description="Shopper reference size: XS, S, M, L, XL, XXL, 32, 34..."
+    )
     fit_preference: str = Field(
         default="tailored",
         description="Fit preference: tight | tailored | regular | relaxed | oversized",
@@ -391,6 +395,14 @@ class FitRecommendRequest(BaseModel):
     waist_inches: float | None = Field(
         default=None, ge=15.0, le=70.0, description="Shopper waist circumference in inches"
     )
+
+    @field_validator("known_brand", "known_size", mode="after")
+    @classmethod
+    def validate_non_blank_strings(cls, v: str) -> str:
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError("Field must not be empty or whitespace only.")
+        return stripped
 
 
 class FitRecommendationResponse(BaseModel):

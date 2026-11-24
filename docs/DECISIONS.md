@@ -32,6 +32,7 @@
 | [ADR-019](#adr-019-local-async-sqlite-persistence-with-postgresql-compatibility-for-hackathon-zero-dependency-delivery) | Local Async SQLite Persistence with PostgreSQL Compatibility for Zero-Dependency Delivery | Spec Ambiguity | Accepted | 2026-11-23 |
 | [ADR-020](#adr-020-disambiguation-and-segregation-of-blended-rto-vs-cod-only-rto-and-customer-returns) | Disambiguation and Segregation of Blended RTO vs. COD-Only RTO and Customer Returns | Item B4 / §B | Accepted | 2026-11-24 |
 | [ADR-021](#adr-021-nextjs-142-patch-upgrade-to-14235-and-dependency-vulnerability-audit) | Next.js 14.2 Patch Upgrade to 14.2.35 and Dependency Vulnerability Audit | Item B5 / E10 | Accepted | 2026-11-24 |
+| [ADR-022](#adr-022-boundary-validation-address-sanitization-and-state-resilience-bug-fixes) | Boundary Validation, Address Sanitization, and State Resilience Bug Fixes | Plan Bugs 1-6 | Accepted | 2026-11-24 |
 
 ---
 
@@ -585,4 +586,43 @@
 - **Affected Files & Tests:**  
   - `frontend/package.json`
   - `frontend/package-lock.json`
+  - `docs/DECISIONS.md`
+
+---
+
+## ADR-022: Boundary Validation, Address Sanitization, and State Resilience Bug Fixes
+
+- **Status:** Accepted
+- **Reference:** Implementation Plan Bugs 1–6 / Exploit Hardening
+- **Date:** 2026-11-24
+- **Context & Problem:**  
+  During adversarial inspection and penetration analysis of the codebase, 6 edge-case and boundary vulnerabilities were identified:
+  1. Repeated address verification in `orders.py` appended redundant `, Near {landmark}` and produced `Near Near` duplications.
+  2. Frontend checkout evaluated incentives with a hardcoded `risk_score_index: 55` instead of awaiting the dynamic `evaluateRisk` result.
+  3. `FitRecommendRequest` allowed empty or whitespace strings (`known_size: ""`), bypassing schema validation and corrupting explanation text.
+  4. Direct navigation to `/simulator` without parameters defaulted to unbound `ORD-DEMO-001`, leading to 404s on verification.
+  5. Invalid/non-existent SKUs on PDP (e.g. `/products/SKU-999`) silently rendered SKU-01 instead of a clean 404 state.
+  6. Order confirmation page rendered hardcoded fallback strings (`"Priya Sharma"`, `"House 12, Sector 15, Delhi"`) during load or error states.
+  7. Order creation permitted discounts exceeding the total cart value.
+- **Decision & Binding Resolution:**  
+  1. Update `orders.py` verification logic to guard against redundant landmark concatenation and strip duplicated landmark prefixes.
+  2. Sequence `evaluateRisk` before `getIncentiveQuote` in `checkout/page.tsx`, passing the real `risk_score_index`.
+  3. Enforce `min_length=1` and whitespace-stripping `@field_validator` on `known_brand` and `known_size` in `FitRecommendRequest`.
+  4. In `simulator/page.tsx`, fetch the latest live order from `/v1/orders?limit=1` or fall back to verified seed order `ord_seed_150`.
+  5. In `products/[skuId]/page.tsx`, render an explicit `ProductNotFound` component with a back-link when the SKU is not in the catalog.
+  6. In `confirmation/[orderId]/page.tsx`, remove hardcoded dummy recipient/address strings in favor of dynamic loading placeholders.
+  7. In `orders.py`, reject `applied_discount_inr > subtotal` with HTTP 422 Unprocessable Content.
+- **Consequences:**  
+  - *Positive:* Hardens all boundaries against exploits and malformed payloads; guarantees database synchronicity across all direct navigation flows; prevents state desynchronization.
+  - *Negative:* None.
+  - *Invariants:* All requests must pass Pydantic boundary validation; real evaluated risk scores are always passed to the incentive solver; COD remains unblocked across all flows.
+- **Affected Files & Tests:**  
+  - `backend/app/api/orders.py`
+  - `backend/app/schemas/api_contracts.py`
+  - `backend/tests/api/test_orders_and_checkout_api.py`
+  - `frontend/app/checkout/page.tsx`
+  - `frontend/app/simulator/page.tsx`
+  - `frontend/app/products/[skuId]/page.tsx`
+  - `frontend/app/confirmation/[orderId]/page.tsx`
+  - `frontend/tests/smoke.test.tsx`
   - `docs/DECISIONS.md`

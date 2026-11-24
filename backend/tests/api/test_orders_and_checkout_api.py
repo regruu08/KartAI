@@ -217,3 +217,57 @@ async def test_verify_order_persists_clarified_landmark_in_delivery_event(
     assert verify_res.status_code == 200
     assert exact_landmark in verify_res.json()["street_address"]
     assert verify_res.json()["address_status"] == "Complete"
+
+    # Re-verify to ensure no duplicate landmark concatenation occurs (Bug 1 fix)
+    verify_res_repeat = await async_client.post(f"/v1/orders/{order_id}/verify", json=verify_payload)
+    assert verify_res_repeat.status_code == 200
+    addr = verify_res_repeat.json()["street_address"]
+    assert addr.count(exact_landmark) == 1
+    assert "Near Near" not in addr
+
+
+@pytest.mark.asyncio
+async def test_order_creation_rejects_discount_exceeding_subtotal(async_client: AsyncClient) -> None:
+    """Test POST /v1/orders rejects discount > subtotal with 422."""
+    payload = {
+        "sku_id": "SKU-01",
+        "size": "M",
+        "quantity": 1,
+        "customer_name": "Exploit Tester",
+        "customer_phone": "9876543211",
+        "street_address": "Flat 304, Green Glen Layout",
+        "city": "Delhi",
+        "state": "Delhi",
+        "pin_code": "110001",
+        "payment_method": "COD",
+        "applied_discount_inr": "50000.00",
+    }
+    res = await async_client.post("/v1/orders", json=payload)
+    assert res.status_code == 422
+    assert "cannot exceed order subtotal" in res.text
+
+
+@pytest.mark.asyncio
+async def test_fit_recommend_rejects_empty_and_whitespace_size(async_client: AsyncClient) -> None:
+    """Test POST /v1/fit/recommend rejects empty or whitespace-only known_size and known_brand with 422."""
+    # Empty string known_size
+    res_empty = await async_client.post(
+        "/v1/fit/recommend",
+        json={"sku_id": "SKU-01", "known_brand": "Zara", "known_size": ""},
+    )
+    assert res_empty.status_code == 422
+
+    # Whitespace-only known_size
+    res_space = await async_client.post(
+        "/v1/fit/recommend",
+        json={"sku_id": "SKU-01", "known_brand": "Zara", "known_size": "   "},
+    )
+    assert res_space.status_code == 422
+
+    # Empty known_brand
+    res_brand_empty = await async_client.post(
+        "/v1/fit/recommend",
+        json={"sku_id": "SKU-01", "known_brand": "", "known_size": "M"},
+    )
+    assert res_brand_empty.status_code == 422
+

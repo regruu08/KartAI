@@ -68,22 +68,21 @@ export default function CheckoutPage() {
 
     try {
       if (paymentMethod === "COD") {
-        // Evaluate operational risk and dynamic margin-safe incentive quote
-        const [riskRes, incRes] = await Promise.all([
-          api.evaluateRisk({
-            street_address: streetAddress,
-            pin_code: pinCode.trim(),
-            payment_method: "COD",
-            has_used_fit_twin: cart.some((i) => i.fitVerified),
-            is_bracketing: hasBracketing,
-          }),
-          api.getIncentiveQuote({
-            cart_total_inr: effectiveSubtotal,
-            risk_score_index: 55, // Estimated baseline
-            current_payment: "COD",
-            has_used_fit_twin: cart.some((i) => i.fitVerified),
-          }),
-        ]);
+        // Evaluate operational risk first to obtain dynamic evaluated risk score
+        const riskRes = await api.evaluateRisk({
+          street_address: streetAddress,
+          pin_code: pinCode.trim(),
+          payment_method: "COD",
+          has_used_fit_twin: cart.some((i) => i.fitVerified),
+          is_bracketing: hasBracketing,
+        });
+
+        const incRes = await api.getIncentiveQuote({
+          cart_total_inr: effectiveSubtotal,
+          risk_score_index: riskRes.risk_score_index,
+          current_payment: "COD",
+          has_used_fit_twin: cart.some((i) => i.fitVerified),
+        });
 
         setRiskData(riskRes);
         setIncentiveData(incRes);
@@ -124,7 +123,9 @@ export default function CheckoutPage() {
         payment_method: confirmedPaymentMethod,
         applied_discount_inr: appliedDiscount,
         incentive_reason_code:
-          appliedDiscount > 0 ? "REASON_ELEVATED_RISK_CONVERTIBLE" : undefined,
+          appliedDiscount > 0
+            ? (incentiveData?.reason_code ?? "REASON_ELEVATED_RISK_CONVERTIBLE")
+            : undefined,
         has_used_fit_twin: cart.some((i) => i.fitVerified),
         is_bracketing: hasBracketing,
         known_brand: activeItem?.knownBrand,
