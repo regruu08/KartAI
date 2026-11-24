@@ -132,10 +132,10 @@ export function WhatsAppPhoneSimulator({
           nextStep: "SAFE_FOR_DISPATCH",
         });
 
-        // Sync with backend API
+        // Sync with backend API (never fabricate dummy landmark)
         try {
           await api.verifyOrder(state.orderId, {
-            landmark: state.landmark ?? "Near Landmark",
+            landmark: state.landmark ? state.landmark : undefined,
             delivery_slot: trimmed,
             opt_in_whatsapp: true,
           });

@@ -79,6 +79,7 @@ describe("WhatsApp Simulator Conversation Machine", () => {
       type: "SEND_USER_MESSAGE",
       text: "Near Metro Pillar 45",
     });
+    expect(provided.landmark).toBe("Near Metro Pillar 45");
 
     // Bot asks for delivery slot
     const askSlot = conversationReducer(provided, {
@@ -87,6 +88,47 @@ describe("WhatsApp Simulator Conversation Machine", () => {
       nextStep: "SLOT_SELECTION",
     });
     expect(askSlot.step).toBe("SLOT_SELECTION");
+    expect(askSlot.landmark).toBe("Near Metro Pillar 45");
+
+    // User chooses slot
+    const slotChosen = conversationReducer(askSlot, {
+      type: "SEND_USER_MESSAGE",
+      text: "Morning (9 AM - 1 PM)",
+    });
+    expect(slotChosen.deliverySlot).toBe("Morning (9 AM - 1 PM)");
+    expect(slotChosen.landmark).toBe("Near Metro Pillar 45");
+  });
+
+  describe("Transition Table Tests", () => {
+    it.each([
+      { input: "Opposite City Hospital", expectedLandmark: "Opposite City Hospital", desc: "quick reply landmark" },
+      { input: "Near Gate 2, Behind Police Chowki", expectedLandmark: "Near Gate 2, Behind Police Chowki", desc: "free text landmark" },
+      { input: "   ", expectedLandmark: null, desc: "empty text leaves landmark null" },
+    ])("AWAITING_LANDMARK with $desc sets landmark appropriately", ({ input, expectedLandmark }) => {
+      const stateInLandmarkStep: ConversationState = {
+        ...initialBaseState,
+        step: "AWAITING_LANDMARK",
+      };
+      const result = conversationReducer(stateInLandmarkStep, {
+        type: "SEND_USER_MESSAGE",
+        text: input,
+      });
+      expect(result.landmark).toBe(expectedLandmark);
+    });
+
+    it("does not overwrite landmark on subsequent steps with slot text", () => {
+      const stateWithLandmark: ConversationState = {
+        ...initialBaseState,
+        step: "SLOT_SELECTION",
+        landmark: "Near Metro Pillar 120",
+      };
+      const result = conversationReducer(stateWithLandmark, {
+        type: "SEND_USER_MESSAGE",
+        text: "Afternoon (2 PM - 6 PM)",
+      });
+      expect(result.landmark).toBe("Near Metro Pillar 120");
+      expect(result.deliverySlot).toBe("Afternoon (2 PM - 6 PM)");
+    });
   });
 
   it("handles NDR simulation trigger", () => {

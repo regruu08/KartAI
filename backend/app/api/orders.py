@@ -264,12 +264,20 @@ async def verify_order(
         await session.refresh(order)
         return _model_to_response(order)
 
+    # Validate landmark requirement if address quality was NeedsLandmark or Poor
+    clean_landmark = request.landmark.strip() if request.landmark else None
+    if order.address_status in ("NeedsLandmark", "Poor") and not clean_landmark:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Delivery landmark is required to verify this address before dispatch.",
+        )
+
     # If landmark provided, run conversational address normalizer
-    if request.landmark:
+    if clean_landmark:
         normalizer = AddressNormalizer()
         norm_result = await normalizer.normalize(
             raw_address=order.street_address,
-            landmark=request.landmark,
+            landmark=clean_landmark,
         )
         if norm_result.landmark:
             order.street_address = f"{norm_result.sanitized_address}, Near {norm_result.landmark}"
@@ -281,8 +289,8 @@ async def verify_order(
     order.consent_status = "opted_in"
 
     details = []
-    if request.landmark:
-        details.append(f"Landmark: {request.landmark}")
+    if clean_landmark:
+        details.append(f"Landmark: {clean_landmark}")
     if request.delivery_slot:
         details.append(f"Slot: {request.delivery_slot}")
     detail_str = ", ".join(details) if details else "Direct slot confirmation"
@@ -291,6 +299,7 @@ async def verify_order(
         id=f"evt_{uuid.uuid4().hex[:12]}",
         order_id=order.id,
         event_type="Address_Verified",
+        clarified_landmark=clean_landmark,
         reason=detail_str,
     )
     session.add(event)

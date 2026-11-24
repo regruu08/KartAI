@@ -198,6 +198,7 @@ class DeliveryEventModel(Base):
     id: Mapped[str] = mapped_column(String(50), primary_key=True)
     order_id: Mapped[str] = mapped_column(String(50), ForeignKey("orders.id"), nullable=False)
     event_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    clarified_landmark: Mapped[str | None] = mapped_column(String(255), nullable=True, default=None)
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

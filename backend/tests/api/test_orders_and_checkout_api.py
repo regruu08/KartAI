@@ -141,3 +141,80 @@ async def test_order_creation_and_lifecycle(async_client: AsyncClient) -> None:
     ndr_res = await async_client.post(f"/v1/orders/{order_id}/ndr", json=ndr_payload)
     assert ndr_res.status_code == 200
     assert ndr_res.json()["order_status"] == "Delivery_Rescheduled"
+
+
+@pytest.mark.asyncio
+async def test_verify_order_missing_landmark_when_needed_returns_422(
+    async_client: AsyncClient,
+) -> None:
+    """Verify POST /v1/orders/{id}/verify returns 422 if address needs landmark but landmark is omitted."""
+    create_payload = {
+        "sku_id": "SKU-01",
+        "size": "M",
+        "quantity": 1,
+        "customer_name": "Rohan Gupta",
+        "customer_phone": "9876543211",
+        "street_address": "Flat 304, Green Glen Layout",  # Lacks landmark -> NeedsLandmark
+        "city": "Delhi",
+        "state": "Delhi",
+        "pin_code": "110001",
+        "payment_method": "COD",
+        "applied_discount_inr": "0.00",
+        "has_used_fit_twin": True,
+        "is_bracketing": False,
+        "known_brand": "Zara",
+        "known_size": "M",
+    }
+    create_res = await async_client.post("/v1/orders", json=create_payload)
+    assert create_res.status_code == 201
+    order = create_res.json()
+    order_id = order["id"]
+    assert order["address_status"] == "NeedsLandmark"
+
+    # Attempt verify without landmark
+    verify_payload = {
+        "delivery_slot": "10 AM - 1 PM",
+        "opt_in_whatsapp": True,
+    }
+    verify_res = await async_client.post(f"/v1/orders/{order_id}/verify", json=verify_payload)
+    assert verify_res.status_code == 422
+    assert "landmark" in verify_res.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_verify_order_persists_clarified_landmark_in_delivery_event(
+    async_client: AsyncClient,
+) -> None:
+    """Verify clarified landmark is persisted in DeliveryEventModel.clarified_landmark."""
+    create_payload = {
+        "sku_id": "SKU-01",
+        "size": "M",
+        "quantity": 1,
+        "customer_name": "Rohan Gupta",
+        "customer_phone": "9876543211",
+        "street_address": "Flat 304, Green Glen Layout",
+        "city": "Delhi",
+        "state": "Delhi",
+        "pin_code": "110001",
+        "payment_method": "COD",
+        "applied_discount_inr": "0.00",
+        "has_used_fit_twin": True,
+        "is_bracketing": False,
+        "known_brand": "Zara",
+        "known_size": "M",
+    }
+    create_res = await async_client.post("/v1/orders", json=create_payload)
+    assert create_res.status_code == 201
+    order_id = create_res.json()["id"]
+
+    exact_landmark = "Opposite Gate 3, City Mall"
+    verify_payload = {
+        "landmark": exact_landmark,
+        "delivery_slot": "2 PM - 6 PM",
+        "opt_in_whatsapp": True,
+    }
+    verify_res = await async_client.post(f"/v1/orders/{order_id}/verify", json=verify_payload)
+    assert verify_res.status_code == 200
+    assert exact_landmark in verify_res.json()["street_address"]
+    assert verify_res.json()["address_status"] == "Complete"
+

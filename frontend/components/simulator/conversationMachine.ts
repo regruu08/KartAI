@@ -121,8 +121,21 @@ export function conversationReducer(
         };
       }
 
+      // Capture landmark when in AWAITING_LANDMARK and slot when in SLOT_SELECTION (ADR-015 / A1)
+      const updatedLandmark =
+        state.step === "AWAITING_LANDMARK"
+          ? (userText || state.landmark)
+          : state.landmark;
+
+      const updatedDeliverySlot =
+        state.step === "SLOT_SELECTION"
+          ? (userText || state.deliverySlot)
+          : state.deliverySlot;
+
       return {
         ...state,
+        landmark: updatedLandmark,
+        deliverySlot: updatedDeliverySlot,
         messages: updatedMessages,
         isTyping: true,
       };
