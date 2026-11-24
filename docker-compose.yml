@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: returnzero-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_NAME=returnzero-api
+      - ENVIRONMENT=production
+      - HOST=0.0.0.0
+      - PORT=8000
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - DATABASE_URL=sqlite+aiosqlite:///./returnzero.db
+      - GEMINI_MODEL_ID=gemini-3.8-flash
+      - PRIMARY_GEMINI_API_KEY=${PRIMARY_GEMINI_API_KEY:-}
+      - BACKUP_GEMINI_API_KEY=${BACKUP_GEMINI_API_KEY:-}
+      - GEMINI_TIMEOUT_S=4.0
+      - DEMO_MODE=true
+      - DEMO_TOKEN=returnzero-demo-secret-2026
+      - UPI_GATEWAY_FEE_PCT=0.0
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/healthz"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=http://localhost:8000
+    container_name: returnzero-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_DEMO_MODE=true
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
