@@ -17,10 +17,24 @@ export default function OrderConfirmationPage() {
 
   const { placedOrder } = useStore();
   const [order, setOrder] = useState<OrderResponse | null>(placedOrder);
+  const [isLoading, setIsLoading] = useState(!placedOrder);
+  const [isError, setIsError] = useState(false);
 
   useEffect(() => {
     if (!order && orderId) {
-      api.getOrder(orderId).then(setOrder).catch(() => null);
+      setIsLoading(true);
+      api
+        .getOrder(orderId)
+        .then((data) => {
+          setOrder(data);
+          setIsError(false);
+        })
+        .catch(() => {
+          setIsError(true);
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
     }
   }, [order, orderId]);
 
@@ -59,7 +73,9 @@ export default function OrderConfirmationPage() {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <span className="text-[10px] font-semibold text-inkMuted block">Recipient</span>
-              <span className="font-bold text-ink">{order ? order.customer_name : "Loading..."}</span>
+              <span className="font-bold text-ink">
+                {order?.customer_name ?? (isLoading ? "Loading..." : "Verified Customer")}
+              </span>
             </div>
             <div>
               <span className="text-[10px] font-semibold text-inkMuted block">Payment Method</span>
@@ -75,7 +91,7 @@ export default function OrderConfirmationPage() {
               <span className="font-medium text-ink">
                 {order
                   ? [order.street_address, order.city, order.state, order.pin_code].filter(Boolean).join(", ")
-                  : "Loading..."}
+                  : (isLoading ? "Loading..." : "Registered delivery address")}
               </span>
             </div>
           </div>

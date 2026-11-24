@@ -219,7 +219,9 @@ async def test_verify_order_persists_clarified_landmark_in_delivery_event(
     assert verify_res.json()["address_status"] == "Complete"
 
     # Re-verify to ensure no duplicate landmark concatenation occurs (Bug 1 fix)
-    verify_res_repeat = await async_client.post(f"/v1/orders/{order_id}/verify", json=verify_payload)
+    verify_res_repeat = await async_client.post(
+        f"/v1/orders/{order_id}/verify", json=verify_payload
+    )
     assert verify_res_repeat.status_code == 200
     addr = verify_res_repeat.json()["street_address"]
     assert addr.count(exact_landmark) == 1
@@ -227,7 +229,9 @@ async def test_verify_order_persists_clarified_landmark_in_delivery_event(
 
 
 @pytest.mark.asyncio
-async def test_order_creation_rejects_discount_exceeding_subtotal(async_client: AsyncClient) -> None:
+async def test_order_creation_rejects_discount_exceeding_subtotal(
+    async_client: AsyncClient,
+) -> None:
     """Test POST /v1/orders rejects discount > subtotal with 422."""
     payload = {
         "sku_id": "SKU-01",
@@ -245,6 +249,42 @@ async def test_order_creation_rejects_discount_exceeding_subtotal(async_client: 
     res = await async_client.post("/v1/orders", json=payload)
     assert res.status_code == 422
     assert "cannot exceed order subtotal" in res.text
+
+    # Reject any discount on COD orders
+    cod_payload = {
+        "sku_id": "SKU-01",
+        "size": "M",
+        "quantity": 1,
+        "customer_name": "COD Exploit Tester",
+        "customer_phone": "9876543211",
+        "street_address": "Flat 304, Green Glen Layout",
+        "city": "Delhi",
+        "state": "Delhi",
+        "pin_code": "110001",
+        "payment_method": "COD",
+        "applied_discount_inr": "25.00",
+    }
+    cod_res = await async_client.post("/v1/orders", json=cod_payload)
+    assert cod_res.status_code == 422
+    assert "Discounts cannot be applied to Cash on Delivery" in cod_res.text
+
+    # Reject discount exceeding maximum incentive ceiling on Prepaid
+    prepaid_payload = {
+        "sku_id": "SKU-01",
+        "size": "M",
+        "quantity": 1,
+        "customer_name": "Prepaid Exploit Tester",
+        "customer_phone": "9876543211",
+        "street_address": "Flat 304, Green Glen Layout",
+        "city": "Delhi",
+        "state": "Delhi",
+        "pin_code": "110001",
+        "payment_method": "PREPAID",
+        "applied_discount_inr": "500.00",
+    }
+    prepaid_res = await async_client.post("/v1/orders", json=prepaid_payload)
+    assert prepaid_res.status_code == 422
+    assert "exceeds maximum allowable incentive limit" in prepaid_res.text
 
 
 @pytest.mark.asyncio
@@ -270,4 +310,3 @@ async def test_fit_recommend_rejects_empty_and_whitespace_size(async_client: Asy
         json={"sku_id": "SKU-01", "known_brand": "", "known_size": "M"},
     )
     assert res_brand_empty.status_code == 422
-

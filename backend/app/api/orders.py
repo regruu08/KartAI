@@ -108,6 +108,16 @@ async def create_order(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Applied discount cannot exceed order subtotal.",
         )
+    if request.payment_method.upper() == "COD" and request.applied_discount_inr > Decimal("0.00"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Discounts cannot be applied to Cash on Delivery (COD) orders.",
+        )
+    if request.applied_discount_inr > Decimal("40.00"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Applied discount exceeds maximum allowable incentive limit of ₹40.00.",
+        )
     total_inr = max(Decimal("0.00"), subtotal - request.applied_discount_inr)
     dispatch_priority = "priority" if request.payment_method.upper() == "PREPAID" else "standard"
 
@@ -291,7 +301,13 @@ async def verify_order(
             and norm_result.landmark.lower() not in sanitized.lower()
             and clean_landmark.lower() not in sanitized.lower()
         ):
-            prefix = "" if norm_result.landmark.lower().startswith(("near", "opp", "opposite", "behind", "beside")) else "Near "
+            prefix = (
+                ""
+                if norm_result.landmark.lower().startswith(
+                    ("near", "opp", "opposite", "behind", "beside")
+                )
+                else "Near "
+            )
             sanitized = f"{sanitized}, {prefix}{norm_result.landmark}"
         order.street_address = sanitized
         order.address_status = "Complete"

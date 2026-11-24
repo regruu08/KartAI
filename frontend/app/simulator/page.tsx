@@ -23,30 +23,30 @@ function SimulatorContent() {
     if (targetId) {
       api.getOrder(targetId).then(setOrder).catch(() => null);
     } else {
-      // Connect to latest database order or fallback to seeded baseline ord_seed_150
+      // Connect to latest database order or fallback to seeded baseline RZ-1042
       api
         .listOrders(1, 0)
         .then((res) => {
           if (res.orders && res.orders.length > 0 && res.orders[0]) {
             setOrder(res.orders[0]);
           } else {
-            api.getOrder("ord_seed_150").then(setOrder).catch(() => null);
+            api.getOrder("RZ-1042").then(setOrder).catch(() => null);
           }
         })
         .catch(() => {
-          api.getOrder("ord_seed_150").then(setOrder).catch(() => null);
+          api.getOrder("RZ-1042").then(setOrder).catch(() => null);
         });
     }
   }, [orderParam, placedOrder]);
 
   const fetchLatestOrder = () => {
-    const targetId = order?.id || orderParam || placedOrder?.id || "ord_seed_150";
+    const targetId = order?.id || orderParam || placedOrder?.id || "RZ-1042";
     if (targetId) {
       api.getOrder(targetId).then(setOrder).catch(() => null);
     }
   };
 
-  const activeOrderId = order?.id || orderParam || "ord_seed_150";
+  const activeOrderId = order?.id || orderParam || "RZ-1042";
   const customerName = order?.customer_name || "Priya Sharma";
   const streetAddress = order?.street_address || "House 12, Sector 15, Near City Market";
   const addressQuality = (order?.address_status as "Complete" | "NeedsLandmark" | "Poor") || "NeedsLandmark";

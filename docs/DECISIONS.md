@@ -608,10 +608,10 @@
   1. Update `orders.py` verification logic to guard against redundant landmark concatenation and strip duplicated landmark prefixes.
   2. Sequence `evaluateRisk` before `getIncentiveQuote` in `checkout/page.tsx`, passing the real `risk_score_index`.
   3. Enforce `min_length=1` and whitespace-stripping `@field_validator` on `known_brand` and `known_size` in `FitRecommendRequest`.
-  4. In `simulator/page.tsx`, fetch the latest live order from `/v1/orders?limit=1` or fall back to verified seed order `ord_seed_150`.
+  4. In `simulator/page.tsx`, fetch the latest live order from `/v1/orders?limit=1` or fall back to canonical seeded order `RZ-1042`.
   5. In `products/[skuId]/page.tsx`, render an explicit `ProductNotFound` component with a back-link when the SKU is not in the catalog.
-  6. In `confirmation/[orderId]/page.tsx`, remove hardcoded dummy recipient/address strings in favor of dynamic loading placeholders.
-  7. In `orders.py`, reject `applied_discount_inr > subtotal` with HTTP 422 Unprocessable Content.
+  6. In `confirmation/[orderId]/page.tsx`, remove hardcoded dummy recipient/address strings in favor of dynamic loading placeholders with proper loading and error states.
+  7. In `orders.py`, reject `applied_discount_inr > subtotal`, any discount applied to COD orders, and discounts exceeding the ₹40.00 maximum incentive ceiling with HTTP 422 Unprocessable Content.
 - **Consequences:**  
   - *Positive:* Hardens all boundaries against exploits and malformed payloads; guarantees database synchronicity across all direct navigation flows; prevents state desynchronization.
   - *Negative:* None.
