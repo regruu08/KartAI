@@ -31,6 +31,7 @@
 | [ADR-018](#adr-018-in-browser-whatsapp-simulator-vs-live-metatwilio-telecom-dependency-elimination) | In-Browser WhatsApp Simulator vs Live Meta/Twilio Telecom Dependency Elimination | Spec Ambiguity | Accepted | 2026-11-23 |
 | [ADR-019](#adr-019-local-async-sqlite-persistence-with-postgresql-compatibility-for-hackathon-zero-dependency-delivery) | Local Async SQLite Persistence with PostgreSQL Compatibility for Zero-Dependency Delivery | Spec Ambiguity | Accepted | 2026-11-23 |
 | [ADR-020](#adr-020-disambiguation-and-segregation-of-blended-rto-vs-cod-only-rto-and-customer-returns) | Disambiguation and Segregation of Blended RTO vs. COD-Only RTO and Customer Returns | Item B4 / §B | Accepted | 2026-11-24 |
+| [ADR-021](#adr-021-nextjs-142-patch-upgrade-to-14235-and-dependency-vulnerability-audit) | Next.js 14.2 Patch Upgrade to 14.2.35 and Dependency Vulnerability Audit | Item B5 / E10 | Accepted | 2026-11-24 |
 
 ---
 
@@ -563,3 +564,25 @@
   - `frontend/components/dashboard/OverviewKPIs.tsx`
   - `docs/DECISIONS.md`
   - `docs/SOURCES_AND_ASSUMPTIONS.md`
+
+---
+
+## ADR-021: Next.js 14.2 Patch Upgrade to 14.2.35 and Dependency Vulnerability Audit
+
+- **Status:** Accepted
+- **Reference:** Audit Item B5 / Erratum E10 (`AGENTS.md` §5)
+- **Date:** 2026-11-24
+- **Context & Problem:**  
+  The frontend package was previously pinned to `next@14.2.18`. While `AGENTS.md` Erratum E10 strictly forbids upgrading to Next.js 15 or React 19, newer security and stability patches within the 14.2.x series are recommended. `npm audit` flagged vulnerabilities in older dependencies while suggesting breaking major upgrades (`next@16`).
+- **Decision & Binding Resolution:**  
+  1. Upgrade `next` and `eslint-config-next` from `14.2.18` to `14.2.35` (the latest available release in the 14.2.x long-term stability branch).
+  2. Reject `npm audit fix --force` which would introduce breaking upgrades to Next 15/16 and React 19 in direct violation of Erratum E10.
+  3. Re-verify the full build (`next build`), typecheck (`tsc --noEmit`), and lint (`eslint`) to confirm 100% compilation and bundle pass.
+- **Consequences:**  
+  - *Positive:* Incorporates critical bug and regression fixes from 17 Next.js 14.2 patch releases without any breaking changes to the App Router or React 18.3 runtime.
+  - *Negative:* None.
+  - *Invariants:* `next` version remains strictly within `14.2.x`; `react` version remains strictly `18.3.1`.
+- **Affected Files & Tests:**  
+  - `frontend/package.json`
+  - `frontend/package-lock.json`
+  - `docs/DECISIONS.md`
