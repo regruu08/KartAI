@@ -30,6 +30,7 @@
 | [ADR-017](#adr-017-d2c-fashion-focus-alignment-and-explicit-rejection-of-stale-q-commerce--pharmacy-specs) | D2C Fashion Focus Alignment and Explicit Rejection of Stale Q-Commerce / Pharmacy Specs | Spec Ambiguity | Accepted | 2026-11-23 |
 | [ADR-018](#adr-018-in-browser-whatsapp-simulator-vs-live-metatwilio-telecom-dependency-elimination) | In-Browser WhatsApp Simulator vs Live Meta/Twilio Telecom Dependency Elimination | Spec Ambiguity | Accepted | 2026-11-23 |
 | [ADR-019](#adr-019-local-async-sqlite-persistence-with-postgresql-compatibility-for-hackathon-zero-dependency-delivery) | Local Async SQLite Persistence with PostgreSQL Compatibility for Zero-Dependency Delivery | Spec Ambiguity | Accepted | 2026-11-23 |
+| [ADR-020](#adr-020-disambiguation-and-segregation-of-blended-rto-vs-cod-only-rto-and-customer-returns) | Disambiguation and Segregation of Blended RTO vs. COD-Only RTO and Customer Returns | Item B4 / §B | Accepted | 2026-11-24 |
 
 ---
 
@@ -536,3 +537,29 @@
   - `backend/app/db/session.py`
   - `backend/app/db/repositories.py`
   - `backend/tests/conftest.py`
+
+---
+
+## ADR-020: Disambiguation and Segregation of Blended RTO vs. COD-Only RTO and Customer Returns
+
+- **Status:** Accepted
+- **Reference:** Audit Item B4 / `SOURCES_AND_ASSUMPTIONS.md` §B
+- **Date:** 2026-11-24
+- **Context & Problem:**  
+  The dashboard showed "Courier RTO Rate 28.5%" (or 28.67% across 150 seeded orders). Without explicit labelling of the denominator, judges or observers may confuse this blended rate (`total_rto_orders / total_orders`) with COD-only RTO (which is ~40.8% in seed data, or ~26% in Shipway FY25 benchmark) or customer returns (post-delivery fit/defect returns, which is 8.0%).
+- **Decision & Binding Resolution:**  
+  1. Clearly label the primary KPI card as "Blended RTO Rate" with subtitle displaying COD and Prepaid RTO breakdowns: `COD: 40.8% · Prepaid: 5.8%`.
+  2. Maintain strict separation between Courier RTO (failed delivery before handover) and Customer Return (post-delivery fit/defect return) in accordance with `SOURCES_AND_ASSUMPTIONS §B`.
+  3. Ensure both backend `AnalyticsOverviewResponse` and frontend API types expose explicit `cod_rto_count`, `cod_rto_rate_pct`, `prepaid_rto_count`, and `prepaid_rto_rate_pct`.
+  4. Attach tooltip descriptions citing `SOURCES_AND_ASSUMPTIONS §B` definitions on hover.
+- **Consequences:**  
+  - *Positive:* Eliminates any risk of judges misinterpreting blended telemetry as COD-only RTO; maintains auditable mathematical definitions across the dashboard.
+  - *Negative:* Slightly more verbose subtitle on the RTO KPI card.
+  - *Invariants:* Denominator of `rto_rate_pct` is always `total_orders`; denominator of `cod_rto_rate_pct` is always `cod_orders_count`.
+- **Affected Files & Tests:**  
+  - `backend/app/schemas/api_contracts.py`
+  - `backend/app/db/repositories.py`
+  - `frontend/lib/api/types.ts`
+  - `frontend/components/dashboard/OverviewKPIs.tsx`
+  - `docs/DECISIONS.md`
+  - `docs/SOURCES_AND_ASSUMPTIONS.md`

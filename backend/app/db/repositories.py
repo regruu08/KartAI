@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from decimal import Decimal
 
-from sqlalchemy import case, func, select
+from sqlalchemy import and_, case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -257,6 +257,30 @@ class AnalyticsRepository:
                 "rto_orders"
             ),
             func.sum(
+                case(
+                    (
+                        and_(
+                            OrderModel.payment_method == "COD",
+                            OrderModel.order_status.in_(RTO_STATUSES),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("cod_rto_orders"),
+            func.sum(
+                case(
+                    (
+                        and_(
+                            OrderModel.payment_method == "Prepaid",
+                            OrderModel.order_status.in_(RTO_STATUSES),
+                        ),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("prepaid_rto_orders"),
+            func.sum(
                 case((OrderModel.order_status.in_(CUSTOMER_RETURN_STATUSES), 1), else_=0)
             ).label("return_orders"),
             func.sum(
@@ -275,12 +299,20 @@ class AnalyticsRepository:
         cod_orders = int(row.cod_orders or 0)
         prepaid_orders = int(row.prepaid_orders or 0)
         rto_count = int(row.rto_orders or 0)
+        cod_rto_orders = int(row.cod_rto_orders or 0)
+        prepaid_rto_orders = int(row.prepaid_rto_orders or 0)
         customer_returns = int(row.return_orders or 0)
         delivered_kept = int(row.delivered_kept_orders or 0)
         active_orders = int(row.active_orders or 0)
 
         cod_share_pct = round((cod_orders / total_orders * 100.0), 2) if total_orders > 0 else 0.0
         rto_rate_pct = round((rto_count / total_orders * 100.0), 2) if total_orders > 0 else 0.0
+        cod_rto_rate_pct = (
+            round((cod_rto_orders / cod_orders * 100.0), 2) if cod_orders > 0 else 0.0
+        )
+        prepaid_rto_rate_pct = (
+            round((prepaid_rto_orders / prepaid_orders * 100.0), 2) if prepaid_orders > 0 else 0.0
+        )
         customer_return_rate_pct = (
             round((customer_returns / total_orders * 100.0), 2) if total_orders > 0 else 0.0
         )
@@ -423,6 +455,10 @@ class AnalyticsRepository:
             cod_share_pct=cod_share_pct,
             rto_count=rto_count,
             rto_rate_pct=rto_rate_pct,
+            cod_rto_count=cod_rto_orders,
+            cod_rto_rate_pct=cod_rto_rate_pct,
+            prepaid_rto_count=prepaid_rto_orders,
+            prepaid_rto_rate_pct=prepaid_rto_rate_pct,
             customer_return_count=customer_returns,
             customer_return_rate_pct=customer_return_rate_pct,
             delivered_kept_count=delivered_kept,

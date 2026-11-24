@@ -28,9 +28,13 @@ export function OverviewKPIs({ data, className }: OverviewKPIsProps) {
       bg: "bg-amber-100",
     },
     {
-      title: "Courier RTO Rate",
+      title: "Blended RTO Rate",
       value: `${data.rto_rate_pct.toFixed(1)}%`,
-      subtitle: `${data.rto_count} failed deliveries`,
+      subtitle:
+        data.cod_rto_rate_pct != null
+          ? `COD: ${data.cod_rto_rate_pct.toFixed(1)}% · Prepaid: ${(data.prepaid_rto_rate_pct ?? 0).toFixed(1)}%`
+          : `${data.rto_count} failed deliveries`,
+      description: "Courier delivery failure before delivery to customer (SOURCES_AND_ASSUMPTIONS §B)",
       icon: Truck,
       color: "text-rose-700",
       bg: "bg-rose-100",
@@ -38,7 +42,8 @@ export function OverviewKPIs({ data, className }: OverviewKPIsProps) {
     {
       title: "Customer Return Rate",
       value: `${data.customer_return_rate_pct.toFixed(1)}%`,
-      subtitle: `${data.customer_return_count} fit/defect returns`,
+      subtitle: `${data.customer_return_count} post-delivery returns`,
+      description: "Delivered product returned post-delivery for fit or defect (SOURCES_AND_ASSUMPTIONS §B)",
       icon: RotateCcw,
       color: "text-purple-700",
       bg: "bg-purple-100",
@@ -77,6 +82,7 @@ export function OverviewKPIs({ data, className }: OverviewKPIsProps) {
         return (
           <Card
             key={idx}
+            title={kpi.description}
             className={cn(
               "p-4 flex flex-col justify-between space-y-2 transition-all hover:scale-102",
               kpi.highlight && "col-span-2 sm:col-span-1 border-2 border-accentEmerald bg-emerald-50/40",

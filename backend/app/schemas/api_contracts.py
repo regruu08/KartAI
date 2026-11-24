@@ -251,7 +251,15 @@ class AnalyticsOverviewResponse(BaseModel):
     prepaid_orders_count: int = Field(description="Number of Prepaid / UPI orders")
     cod_share_pct: float = Field(description="COD percentage share of total orders")
     rto_count: int = Field(description="Total courier RTO delivery failures")
-    rto_rate_pct: float = Field(description="RTO failure rate (RTO orders / total orders)")
+    rto_rate_pct: float = Field(description="Blended RTO failure rate (RTO orders / total orders)")
+    cod_rto_count: int = Field(default=0, description="COD courier RTO failures")
+    cod_rto_rate_pct: float = Field(
+        default=0.0, description="COD RTO failure rate (COD RTO / COD orders)"
+    )
+    prepaid_rto_count: int = Field(default=0, description="Prepaid courier RTO failures")
+    prepaid_rto_rate_pct: float = Field(
+        default=0.0, description="Prepaid RTO failure rate (Prepaid RTO / Prepaid orders)"
+    )
     customer_return_count: int = Field(description="Post-delivery customer returns (fit + defect)")
     customer_return_rate_pct: float = Field(description="Customer return rate percentage")
     delivered_kept_count: int = Field(description="Orders successfully delivered and retained")

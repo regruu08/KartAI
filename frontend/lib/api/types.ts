@@ -102,6 +102,10 @@ export interface AnalyticsOverviewResponse {
   cod_share_pct: number;
   rto_count: number;
   rto_rate_pct: number;
+  cod_rto_count?: number;
+  cod_rto_rate_pct?: number;
+  prepaid_rto_count?: number;
+  prepaid_rto_rate_pct?: number;
   customer_return_count: number;
   customer_return_rate_pct: number;
   delivered_kept_count: number;
