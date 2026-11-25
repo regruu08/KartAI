@@ -626,3 +626,36 @@
   - `frontend/app/confirmation/[orderId]/page.tsx`
   - `frontend/tests/smoke.test.tsx`
   - `docs/DECISIONS.md`
+
+---
+
+## ADR-023: WCAG AA Violet Palette Refinement, Tailwind Scale Preservation, and Server-Side Demo Token Proxy
+
+- **Status:** Accepted
+- **Reference:** Phase B Implementation Plan (`frontend-design` pass + `AGENTS.md` §6 Engineering Standards)
+- **Date:** 2026-11-25
+- **Context & Problem:**  
+  1. `frontend/tailwind.config.ts` previously defined `emerald`, `rose`, and `amber` as bare hex strings under `theme.extend.colors`, overwriting Tailwind's built-in 50–950 utility scales and silently breaking status badges (`bg-emerald-50`, `text-emerald-700`, `bg-amber-50`, etc.).
+  2. The legacy `#7938F5` violet accent against `#F5F0FF` canvas yielded borderline contrast for small UI labels, and `frontend` had no Google font loading, route transition wrapper, or ErrorBoundary guardrails.
+  3. `DemoResetButton.tsx` and `client.ts` hardcoded `"secret-demo-token-2026"` directly in client-side JS bundles (which failed with HTTP `403` against backend default `"returnzero-demo-secret-2026"` and violated secret hygiene).
+- **Decision & Binding Resolution:**  
+  1. Restore full Tailwind `emerald`/`rose`/`amber` color scales while refining brand tokens (`canvas: #FAF8FD`, `surface: #FFFFFF`, `subtle: #F9F6FE`, `brand: #6D28D9` for WCAG AA contrast, `brandHover: #5B21B6`, `ink: #171321`, `inkMuted: #585266`, `trust: #059669`, `warn: #D97706`, `danger: #B42318`).
+  2. Load `Playfair Display`, `Plus Jakarta Sans`, and `JetBrains Mono` via self-hosted `@fontsource` packages (`@fontsource/playfair-display`, `@fontsource/plus-jakarta-sans`, `@fontsource/jetbrains-mono`) in `app/layout.tsx` paired with CSS custom properties in `app/globals.css` (preventing flaky build-time Google Fonts network failures), add GPU-composited `app/template.tsx` route transitions honoring `prefers-reduced-motion`, and wrap modules in `ErrorBoundary` + TanStack Query `AppProviders`.
+  3. Proxy demo database resets through Next.js server route handler `POST /api/demo/reset`, keeping `DEMO_TOKEN` out of `NEXT_PUBLIC_*` client JavaScript bundles.
+- **Consequences:**  
+  - *Positive:* Preserves Tailwind utility scales, enforces WCAG AA contrast, delivers smooth cross-route transitions, and eliminates hardcoded/leaked client tokens.
+  - *Negative:* None.
+- **Affected Files & Tests:**  
+  - `frontend/tailwind.config.ts`
+  - `frontend/app/globals.css`
+  - `frontend/app/layout.tsx`
+  - `frontend/app/template.tsx`
+  - `frontend/app/api/demo/reset/route.ts`
+  - `frontend/components/providers/AppProviders.tsx`
+  - `frontend/components/ui/ErrorBoundary.tsx`
+  - `frontend/components/dashboard/DemoResetButton.tsx`
+  - `frontend/lib/api/client.ts`
+  - `frontend/lib/api/hooks.ts`
+  - `frontend/lib/api/types.ts`
+  - `frontend/lib/store.ts`
+  - `docs/DECISIONS.md`
