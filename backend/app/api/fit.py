@@ -38,7 +38,7 @@ async def recommend_fit(
     sku_id = request.sku_id.strip()
     if not sku_id:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Field 'sku_id' is required in request body.",
         )
 
@@ -58,6 +58,7 @@ async def recommend_fit(
         height_cm=request.height_cm,
         chest_inches=request.chest_inches,
         waist_inches=request.waist_inches,
+        custom_catalog=CatalogService.to_sizing_catalog(sku),
     )
 
     # Persist FitLogModel entry per AGENTS.md §7 contract

@@ -13,6 +13,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from app.config import Settings
 from app.integrations.gemini.adapter import (
     AddressNormalizerProtocol,
     CircuitBreakerOpenException,
@@ -23,7 +24,10 @@ from app.integrations.gemini.prompts import (
     ADDRESS_NORMALIZATION_SYSTEM_PROMPT,
     build_address_prompt,
 )
-from app.schemas.api_contracts import NormalizedAddressResult
+from app.schemas.api_contracts import (
+    GeminiAddressNormalizationPayload,
+    NormalizedAddressResult,
+)
 
 logger = logging.getLogger("returnzero.integrations.gemini.normalizer")
 
@@ -113,8 +117,12 @@ def deterministic_fallback_normalize(
 class AddressNormalizer(AddressNormalizerProtocol):
     """Conversational address & landmark cleansing service with offline fallback."""
 
-    def __init__(self, adapter: GeminiAdapter | None = None) -> None:
-        self.adapter = adapter or GeminiAdapter()
+    def __init__(
+        self,
+        adapter: GeminiAdapter | None = None,
+        settings: Settings | None = None,
+    ) -> None:
+        self.adapter = adapter if adapter is not None else GeminiAdapter(settings=settings)
 
     async def normalize(
         self,
@@ -133,12 +141,15 @@ class AddressNormalizer(AddressNormalizerProtocol):
             raw_text, _ = await self.adapter.generate_content(
                 contents=contents,
                 system_instruction=ADDRESS_NORMALIZATION_SYSTEM_PROMPT,
-                response_schema=NormalizedAddressResult,
+                response_schema=GeminiAddressNormalizationPayload,
                 temperature=0.1,
             )
 
-            result = NormalizedAddressResult.model_validate_json(raw_text)
-            result.provenance = "live_gemini"
+            parsed_payload = GeminiAddressNormalizationPayload.model_validate_json(raw_text)
+            result = NormalizedAddressResult(
+                **parsed_payload.model_dump(),
+                provenance="live_gemini",
+            )
             logger.info("[ADDRESS NORMALIZER] Live cleansing success via %s", self.adapter.model_id)
             return result
 

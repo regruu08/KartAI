@@ -25,6 +25,7 @@ from app.db.models import (
     OrderModel,
     SkuModel,
 )
+from app.domain.incentive import calculate_incentive_quote
 from app.domain.sizing import CURATED_SKUS
 from app.schemas.api_contracts import OrderOutcomeStatus
 
@@ -415,41 +416,31 @@ async def seed_initial_data(session: AsyncSession) -> dict[str, int]:
             else:
                 risk_score = rng.randint(5, 25)
 
-            # Incentive intervention
+            # Incentive intervention computed via closed-form domain solver
             discount_applied = Decimal("0.00")
-            if payment_method == "COD" and risk_score >= 35 and rng.random() < 0.35:
-                # Converted to UPI via incentive
-                intervention_id = str(uuid.uuid4())
+            if payment_method == "COD" and risk_score >= 35:
+                quote = calculate_incentive_quote(
+                    cart_total_inr=base_price,
+                    risk_score_index=max(40, risk_score),
+                    current_payment="COD",
+                    has_used_fit_twin=used_fit,
+                )
+                converted = rng.random() < 0.35
                 interventions_to_add.append(
                     IncentiveInterventionModel(
-                        id=intervention_id,
+                        id=str(uuid.uuid4()),
                         order_id=order_id,
                         original_payment="COD",
-                        offered_discount_inr=Decimal("40.00"),
-                        converted_to_upi=True,
-                        expected_savings_inr=Decimal("48.00"),
-                        retained_headroom_inr=Decimal("8.00"),
-                        reason_code="REASON_ELEVATED_RISK_CONVERTIBLE",
+                        offered_discount_inr=quote.recommended_discount_inr,
+                        converted_to_upi=converted,
+                        expected_savings_inr=quote.expected_avoided_loss_inr,
+                        retained_headroom_inr=quote.headroom_inr,
+                        reason_code=quote.reason_code,
                         created_at=created_at,
                     )
                 )
-                discount_applied = Decimal("40.00")
-            elif payment_method == "COD" and risk_score >= 35:
-                # Offered but not converted
-                intervention_id = str(uuid.uuid4())
-                interventions_to_add.append(
-                    IncentiveInterventionModel(
-                        id=intervention_id,
-                        order_id=order_id,
-                        original_payment="COD",
-                        offered_discount_inr=Decimal("40.00"),
-                        converted_to_upi=False,
-                        expected_savings_inr=Decimal("48.00"),
-                        retained_headroom_inr=Decimal("8.00"),
-                        reason_code="REASON_ELEVATED_RISK_CONVERTIBLE",
-                        created_at=created_at,
-                    )
-                )
+                if converted:
+                    discount_applied = quote.recommended_discount_inr
 
             total_inr = base_price - discount_applied
 

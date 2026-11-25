@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -326,3 +327,35 @@ def test_sku_03_missing_sleeve_uncertainty_reporting() -> None:
     for m in sku_03.measurements_table:
         assert m.chest_inches is not None
         assert m.shoulder_inches is not None
+
+
+@pytest.mark.asyncio
+async def test_extractor_image_inputs_and_corrupted_fixture_fallback(tmp_path: Path) -> None:
+    """Cover Path/RGBA image preprocessing, image_bytes/image_path extract, and fallback fixture."""
+    # RGBA image saved to disk -> Path input conversion to RGB JPEG
+    rgba_img = Image.new("RGBA", (300, 300), color=(10, 20, 30, 128))
+    img_path = tmp_path / "garment.png"
+    rgba_img.save(img_path, format="PNG")
+
+    jpeg_bytes, sha_path, sdk_img = preprocess_image(img_path)
+    assert len(jpeg_bytes) > 0
+    assert len(sha_path) == 64
+    assert sdk_img.mode == "RGB"
+
+    # Corrupted fixture JSON triggers CURATED_SKUS fallback cleanly
+    bad_fixtures_dir = tmp_path / "fixtures"
+    bad_fixtures_dir.mkdir()
+    (bad_fixtures_dir / "sku_03.json").write_text("{corrupt json", encoding="utf-8")
+
+    extractor = CatalogExtractor(fixtures_dir=bad_fixtures_dir)
+    fallback_03 = extractor.load_fixture("SKU-03")
+    assert fallback_03.provenance == ProvenanceEnum.FIXTURE.value
+    assert "sleeve_length" in fallback_03.missing_critical_data
+    assert len(fallback_03.measurements_table) == 4
+
+    # Extract via image_bytes and image_path offline -> returns fallback cleanly without errors
+    res_bytes = await extractor.extract("SKU-03", image_bytes=jpeg_bytes)
+    assert res_bytes.provenance == ProvenanceEnum.FIXTURE.value
+
+    res_path = await extractor.extract("SKU-03", image_path=str(img_path), force_refresh=True)
+    assert res_path.provenance == ProvenanceEnum.FIXTURE.value

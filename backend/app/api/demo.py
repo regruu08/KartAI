@@ -8,8 +8,8 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession
 
 from app.config import Settings, get_settings
 from app.db.seed import seed_initial_data
@@ -27,6 +27,7 @@ router = APIRouter()
     tags=["Demo"],
 )
 async def reset_demo_state(
+    request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     x_demo_token: Annotated[str | None, Header(alias="X-Demo-Token")] = None,
@@ -45,9 +46,11 @@ async def reset_demo_state(
             detail="Invalid or missing X-Demo-Token header.",
         )
 
-    # Reset database schema and re-seed 150 historical records
-    await reset_db()
+    # Reset database schema on the app-bound engine and re-seed 150 historical records
+    app_engine: AsyncEngine | None = getattr(request.app.state, "engine", None)
+    await reset_db(engine_override=app_engine)
     seed_result = await seed_initial_data(session)
+    await session.commit()
 
     return DemoResetResponse(
         status="ok",

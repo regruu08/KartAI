@@ -7,6 +7,7 @@ synthetic parameter sweeps per AGENTS.md §6.4 and IMPLEMENTATION_PLAN.md §3.
 import random
 from decimal import Decimal
 
+from app.data.brand_matrices import SUPPORTED_BRANDS, SUPPORTED_SIZES
 from app.domain.address import address_quality
 from app.domain.incentive import calculate_incentive_quote
 from app.domain.risk import evaluate_order_risk
@@ -111,26 +112,27 @@ class TestSizingInvariants:
     """Verifies monotonicity and confidence bands for sizing engine."""
 
     def test_sizing_monotonicity(self) -> None:
-        """As chest circumference increases, recommended size label never decreases."""
-        size_order = ["XS", "S", "M", "L", "XL"]
+        """As chest circumference increases, recommended size label never decreases across all 5 brands."""
+        size_order = ["XS", "S", "M", "L", "XL", "XXL"]
         sku_ids = ["SKU-01", "SKU-02", "SKU-03", "SKU-04"]
 
         for sku_id in sku_ids:
-            for pref in ["tight", "tailored", "relaxed"]:
-                last_idx = 0
-                for brand_size in ["S", "M", "L"]:
-                    rec = recommend_size(
-                        sku_id=sku_id,
-                        known_brand="Zara",
-                        known_size=brand_size,
-                        fit_preference=pref,
-                    )
-                    curr_idx = size_order.index(rec.recommended_size)
-                    assert curr_idx >= last_idx, (
-                        f"Monotonicity violation on {sku_id} {pref}: "
-                        f"{brand_size} yielded size index {curr_idx} < {last_idx}"
-                    )
-                    last_idx = curr_idx
+            for brand in SUPPORTED_BRANDS:
+                for pref in ["tight", "tailored", "relaxed", "oversized"]:
+                    last_idx = 0
+                    for brand_size in SUPPORTED_SIZES:
+                        rec = recommend_size(
+                            sku_id=sku_id,
+                            known_brand=brand,
+                            known_size=brand_size,
+                            fit_preference=pref,
+                        )
+                        curr_idx = size_order.index(rec.recommended_size)
+                        assert curr_idx >= last_idx, (
+                            f"Monotonicity violation on {sku_id} {brand} {pref}: "
+                            f"{brand_size} yielded size index {curr_idx} < {last_idx}"
+                        )
+                        last_idx = curr_idx
 
     def test_confidence_level_domain_set(self) -> None:
         """Confidence level must strictly be one of High, Medium, Low (Insufficient Data)."""

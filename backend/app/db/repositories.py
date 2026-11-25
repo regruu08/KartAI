@@ -246,13 +246,12 @@ class AnalyticsRepository:
 
     async def get_live_overview(self) -> AnalyticsOverviewResponse:
         """Aggregate dynamic KPIs directly from database tables."""
-        # 1. Total order counts and status breakdowns
+        # 1. Total order counts and status breakdowns (case-insensitive payment_method)
+        norm_payment_col = func.lower(func.trim(OrderModel.payment_method))
         order_metrics_stmt = select(
             func.count(OrderModel.id).label("total_orders"),
-            func.sum(case((OrderModel.payment_method == "COD", 1), else_=0)).label("cod_orders"),
-            func.sum(case((OrderModel.payment_method == "Prepaid", 1), else_=0)).label(
-                "prepaid_orders"
-            ),
+            func.sum(case((norm_payment_col == "cod", 1), else_=0)).label("cod_orders"),
+            func.sum(case((norm_payment_col == "prepaid", 1), else_=0)).label("prepaid_orders"),
             func.sum(case((OrderModel.order_status.in_(RTO_STATUSES), 1), else_=0)).label(
                 "rto_orders"
             ),
@@ -260,7 +259,7 @@ class AnalyticsRepository:
                 case(
                     (
                         and_(
-                            OrderModel.payment_method == "COD",
+                            norm_payment_col == "cod",
                             OrderModel.order_status.in_(RTO_STATUSES),
                         ),
                         1,
@@ -272,7 +271,7 @@ class AnalyticsRepository:
                 case(
                     (
                         and_(
-                            OrderModel.payment_method == "Prepaid",
+                            norm_payment_col == "prepaid",
                             OrderModel.order_status.in_(RTO_STATUSES),
                         ),
                         1,
@@ -339,6 +338,15 @@ class AnalyticsRepository:
                 case(
                     (
                         IncentiveInterventionModel.converted_to_upi.is_(True),
+                        IncentiveInterventionModel.retained_headroom_inr,
+                    ),
+                    else_=Decimal("0.00"),
+                )
+            ).label("total_net_savings"),
+            func.sum(
+                case(
+                    (
+                        IncentiveInterventionModel.converted_to_upi.is_(True),
                         IncentiveInterventionModel.offered_discount_inr,
                     ),
                     else_=Decimal("0.00"),
@@ -350,6 +358,7 @@ class AnalyticsRepository:
 
         converted_to_upi = int(inc_row.converted_orders or 0)
         estimated_direct_savings = Decimal(str(inc_row.total_savings or "0.00"))
+        net_direct_savings = Decimal(str(inc_row.total_net_savings or "0.00"))
         total_disbursed = Decimal(str(inc_row.total_discounts or "0.00"))
 
         # 3. Tier RTO breakdown
@@ -466,6 +475,7 @@ class AnalyticsRepository:
             active_orders_count=active_orders,
             converted_to_upi_count=converted_to_upi,
             estimated_direct_savings_inr=estimated_direct_savings,
+            net_direct_savings_inr=net_direct_savings,
             total_incentives_disbursed_inr=total_disbursed,
             tier_breakdown=tier_stats,
             sku_breakdown=sku_stats,

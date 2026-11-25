@@ -9,6 +9,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import Any
 
+from fastapi import Request
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -18,7 +19,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
-from app.config import get_settings
+from app.config import get_settings, resolve_database_url
 from app.db.models import Base
 
 settings = get_settings()
@@ -26,20 +27,23 @@ settings = get_settings()
 
 def create_session_engine(database_url: str) -> AsyncEngine:
     """Create a configured AsyncEngine for SQLite or PostgreSQL."""
+    resolved_url = resolve_database_url(database_url)
     engine_kwargs: dict[str, Any] = {
         "echo": False,
         "future": True,
     }
 
-    if ":memory:" in database_url:
+    if ":memory:" in resolved_url:
         engine_kwargs["poolclass"] = StaticPool
         engine_kwargs["connect_args"] = {"check_same_thread": False}
 
-    eng: AsyncEngine = create_async_engine(database_url, **engine_kwargs)
+    eng: AsyncEngine = create_async_engine(resolved_url, **engine_kwargs)
 
     @event.listens_for(eng.sync_engine, "connect")
     def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
         """Enforce foreign key integrity and WAL mode on SQLite connections."""
+        if not resolved_url.startswith("sqlite"):
+            return
         cursor = dbapi_connection.cursor()
         try:
             cursor.execute("PRAGMA foreign_keys=ON")
@@ -52,20 +56,27 @@ def create_session_engine(database_url: str) -> AsyncEngine:
     return eng
 
 
+def create_session_factory(target_engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    """Create a configured async session factory bound to the supplied engine."""
+    return async_sessionmaker(
+        bind=target_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+    )
+
+
 # Primary async engine and session factory
 engine: AsyncEngine = create_session_engine(settings.DATABASE_URL)
-
-async_session_factory = async_sessionmaker(
-    bind=engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autoflush=False,
-)
+async_session_factory = create_session_factory(engine)
 
 
-async def get_db_session() -> AsyncIterator[AsyncSession]:
+async def get_db_session(request: Request) -> AsyncIterator[AsyncSession]:
     """FastAPI dependency yielding an isolated asynchronous database session."""
-    async with async_session_factory() as session:
+    factory: async_sessionmaker[AsyncSession] = getattr(
+        request.app.state, "session_factory", async_session_factory
+    )
+    async with factory() as session:
         try:
             yield session
             await session.commit()

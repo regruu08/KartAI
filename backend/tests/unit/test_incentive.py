@@ -31,6 +31,8 @@ class TestIncentiveSolverBaseline:
         )
         assert result.eligible_for_incentive is True
         assert result.recommended_discount_inr == Decimal("40.00")
+        assert result.expected_avoided_loss_inr == Decimal("48.00")
+        assert result.expected_savings_inr == Decimal("8.00")
         assert result.headroom_inr == Decimal("8.00")
         assert result.reason_code == REASON_ELEVATED_RISK_CONVERTIBLE
         assert result.cod_remains_available is True
@@ -75,6 +77,7 @@ class TestConfigurableFeePolicy:
         )
         assert result.eligible_for_incentive is False
         assert result.recommended_discount_inr == Decimal("0.00")
+        assert result.expected_avoided_loss_inr == Decimal("0.00")
         assert result.reason_code == REASON_INSUFFICIENT_MARGIN
 
 
@@ -166,4 +169,5 @@ class TestOfferDiscretization:
         )
         assert result.eligible_for_incentive is False
         assert result.recommended_discount_inr == Decimal("0.00")
+        assert result.expected_avoided_loss_inr == Decimal("0.00")
         assert result.reason_code == REASON_INSUFFICIENT_MARGIN

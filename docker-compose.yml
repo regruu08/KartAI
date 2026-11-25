@@ -14,6 +14,7 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - CORS_ORIGIN_REGEX=^https://returnzero.*\.vercel\.app$
       - DATABASE_URL=sqlite+aiosqlite:///./returnzero.db
       - GEMINI_MODEL_ID=gemini-3.8-flash
       - PRIMARY_GEMINI_API_KEY=${PRIMARY_GEMINI_API_KEY:-}
@@ -36,6 +37,7 @@ services:
       dockerfile: Dockerfile
       args:
         - NEXT_PUBLIC_API_URL=http://localhost:8000
+        - NEXT_PUBLIC_DEMO_MODE=true
     container_name: returnzero-frontend
     ports:
       - "3000:3000"

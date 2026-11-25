@@ -29,3 +29,23 @@ async def test_cors_disallowed_origin(async_client: AsyncClient) -> None:
     }
     response = await async_client.options("/healthz", headers=headers)
     assert response.headers.get("access-control-allow-origin") is None
+
+
+@pytest.mark.asyncio
+async def test_cors_vercel_preview_regex_allowed(async_client: AsyncClient) -> None:
+    """Verify ReturnZero Vercel preview subdomains match allow_origin_regex without wildcard."""
+    preview_origin = "https://returnzero-ai-git-feature-demo.vercel.app"
+    response = await async_client.options(
+        "/healthz",
+        headers={"Origin": preview_origin, "Access-Control-Request-Method": "GET"},
+    )
+    assert response.status_code == 200
+    assert response.headers.get("access-control-allow-origin") == preview_origin
+    assert response.headers.get("access-control-allow-credentials") != "true"
+
+    spoofed_origin = "https://evil-returnzero.vercel.app"
+    spoof_resp = await async_client.options(
+        "/healthz",
+        headers={"Origin": spoofed_origin, "Access-Control-Request-Method": "GET"},
+    )
+    assert spoof_resp.headers.get("access-control-allow-origin") is None

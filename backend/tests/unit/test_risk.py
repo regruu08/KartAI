@@ -4,6 +4,11 @@ Verifies frozen RiskConfig weights, explainable factor attribution, Order Review
 and strict preservation of COD availability per ADR-003 and AGENTS.md §5 (E3).
 """
 
+from app.data.serviceable_pins import (
+    get_pin_metadata,
+    is_high_risk_pin,
+    is_serviceable_pin,
+)
 from app.domain.risk import (
     DEFAULT_RISK_CONFIG,
     evaluate_order_risk,
@@ -134,3 +139,18 @@ class TestRiskEvaluation:
         assert result.risk_score_index == 100
         assert result.risk_level == "Elevated"
         assert result.cod_remains_available is True
+
+
+class TestServiceablePinRegistry:
+    """Verifies synthetic pincode registry helpers."""
+
+    def test_serviceable_and_high_risk_pin_helpers(self) -> None:
+        assert is_serviceable_pin("110001") is True
+        assert is_serviceable_pin("999999") is False
+        assert is_high_risk_pin("143001") is True
+        assert is_high_risk_pin("110001") is False
+        meta = get_pin_metadata("151001")
+        assert meta is not None
+        assert meta.city == "Bhatinda"
+        assert meta.tier == "Tier-3"
+        assert get_pin_metadata("999999") is None

@@ -11,22 +11,22 @@
       "waist_inches": 32.0,
       "hip_inches": 40.0,
       "shoulder_inches": 14.5,
-      "length_inches": 48.0
+      "length_inches": 46.0
     },
     {
       "size_label": "M",
       "chest_inches": 38.0,
       "waist_inches": 34.0,
       "hip_inches": 42.0,
-      "shoulder_inches": 15.0,
-      "length_inches": 48.0
+      "shoulder_inches": 15.5,
+      "length_inches": 47.0
     },
     {
       "size_label": "L",
       "chest_inches": 40.0,
       "waist_inches": 36.0,
       "hip_inches": 44.0,
-      "shoulder_inches": 15.5,
+      "shoulder_inches": 17.0,
       "length_inches": 48.0
     },
     {
@@ -34,8 +34,8 @@
       "chest_inches": 42.0,
       "waist_inches": 38.0,
       "hip_inches": 46.0,
-      "shoulder_inches": 16.0,
-      "length_inches": 48.0
+      "shoulder_inches": 18.0,
+      "length_inches": 49.0
     }
   ],
   "missing_critical_data": [],
