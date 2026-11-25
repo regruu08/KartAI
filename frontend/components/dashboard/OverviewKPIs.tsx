@@ -17,12 +17,12 @@ export function OverviewKPIs({ data, className }: OverviewKPIsProps) {
       subtitle: `${data.cod_orders_count} COD · ${data.prepaid_orders_count} Prepaid`,
       icon: Package,
       color: "text-brand",
-      bg: "bg-brand/10",
+      bg: "bg-brand-soft",
     },
     {
       title: "COD Share",
       value: `${data.cod_share_pct.toFixed(1)}%`,
-      subtitle: "High-risk volume share",
+      subtitle: "COD order share",
       icon: Percent,
       color: "text-amber-700",
       bg: "bg-amber-100",
@@ -67,16 +67,19 @@ export function OverviewKPIs({ data, className }: OverviewKPIsProps) {
     {
       title: "Modelled Direct Savings",
       value: `₹${Number(data.estimated_direct_savings_inr).toLocaleString("en-IN")}`,
-      subtitle: "Avoided courier loss",
+      subtitle:
+        data.net_direct_savings_inr != null
+          ? `Net retained: ₹${Number(data.net_direct_savings_inr).toLocaleString("en-IN")}`
+          : "Avoided courier loss",
       icon: TrendingUp,
-      color: "text-accentEmerald",
+      color: "text-trust-text",
       bg: "bg-emerald-100",
       highlight: true,
     },
   ];
 
   return (
-    <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3", className)}>
+    <div className={cn("grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3.5", className)}>
       {kpis.map((kpi, idx) => {
         const Icon = kpi.icon;
         return (
@@ -84,24 +87,33 @@ export function OverviewKPIs({ data, className }: OverviewKPIsProps) {
             key={idx}
             title={kpi.description}
             className={cn(
-              "p-4 flex flex-col justify-between space-y-2 transition-all hover:scale-102",
-              kpi.highlight && "col-span-2 sm:col-span-1 border-2 border-accentEmerald bg-emerald-50/40",
+              "p-4 flex flex-col justify-between space-y-2.5 transition-all",
+              kpi.highlight &&
+                "col-span-2 sm:col-span-1 border-trust/45 bg-emerald-50/45",
             )}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-inkMuted">
+            <div className="flex items-center justify-between gap-1.5">
+              <span className="text-[11px] font-semibold text-ink-muted leading-tight">
                 {kpi.title}
               </span>
-              <div className={cn("w-6 h-6 rounded-md flex items-center justify-center", kpi.bg, kpi.color)}>
-                <Icon className="w-3.5 h-3.5" />
+              <div
+                className={cn(
+                  "w-7 h-7 rounded-lg flex items-center justify-center shrink-0",
+                  kpi.bg,
+                  kpi.color,
+                )}
+              >
+                <Icon className="w-3.5 h-3.5" aria-hidden="true" />
               </div>
             </div>
 
             <div>
-              <div className={cn("text-xl font-extrabold tracking-tight", kpi.color)}>
+              <div className={cn("text-xl font-bold tracking-tight tabular-nums", kpi.color)}>
                 {kpi.value}
               </div>
-              <p className="text-[10px] text-inkMuted truncate mt-0.5">{kpi.subtitle}</p>
+              <p className="text-[10px] text-ink-muted truncate mt-0.5 tabular-nums">
+                {kpi.subtitle}
+              </p>
             </div>
           </Card>
         );

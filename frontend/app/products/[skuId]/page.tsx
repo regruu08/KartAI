@@ -1,102 +1,50 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Sparkles, ShoppingBag, ArrowLeft, Check, AlertCircle } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  ChevronRight,
+  ShoppingBag,
+  Sparkles,
+} from "lucide-react";
+import { toast } from "sonner";
+import { api } from "@/lib/api/client";
+import type { SkuResponse } from "@/lib/api/types";
+import {
+  ALL_SIZES,
+  FALLBACK_CATALOG_SKUS,
+  getSkuDisplayMeta,
+  isSizeStocked,
+  type SizeLabel,
+} from "@/lib/catalog";
+import { formatInr } from "@/lib/format";
+import { useStore } from "@/lib/store";
+import { cn } from "@/lib/cn";
+import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
+import { Footer } from "@/components/layout/Footer";
 import { Navbar } from "@/components/ui/Navbar";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
+import { GarmentImage } from "@/components/ui/GarmentImage";
 import { ProvenanceBadge } from "@/components/ui/ProvenanceBadge";
+import { RadioChipGroup, type RadioChipOption } from "@/components/ui/RadioChipGroup";
 import { FitDrawer } from "@/components/fit-twin/FitDrawer";
 import { CatalogIntelligencePanel } from "@/components/fit-twin/CatalogIntelligencePanel";
-import { api } from "@/lib/api/client";
-import { useStore } from "@/lib/store";
-import type { SkuResponse } from "@/lib/api/types";
 
-// Curated fallbacks for instant initial render
-const CURATED_DETAILS: Record<string, Partial<SkuResponse> & { image_url: string; description: string }> = {
-  "SKU-01": {
-    id: "SKU-01",
-    name: "Handcrafted Chanderi Silk Anarkali Kurta",
-    category: "Ethnic Apparel",
-    price_inr: 2499,
-    fabric_stretch: "non_stretch",
-    fabric_composition: "100% Chanderi Silk · 70 GSM",
-    has_shoulder: true,
-    has_sleeve: true,
-    length_inches: 48.0,
-    sizes_json: {
-      S: { chest: 36.0, waist: 32.0, shoulder: 14.5, length: 46.0 },
-      M: { chest: 38.0, waist: 34.0, shoulder: 15.5, length: 47.0 },
-      L: { chest: 40.0, waist: 36.0, shoulder: 17.0, length: 48.0 },
-      XL: { chest: 42.0, waist: 38.0, shoulder: 18.0, length: 49.0 },
-    },
-    provenance: "live_gemini",
-    image_url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80",
-    description: "Handwoven in Madhya Pradesh with gold zari border. Rigid zero-stretch weave requiring exact bust ease calibration.",
-  },
-  "SKU-02": {
-    id: "SKU-02",
-    name: "Relaxed Mandarin Collar Linen Shirt",
-    category: "Men's Casuals",
-    price_inr: 1899,
-    fabric_stretch: "slight_stretch",
-    fabric_composition: "100% European Flax Linen · 140 GSM",
-    has_shoulder: true,
-    has_sleeve: true,
-    length_inches: 29.0,
-    sizes_json: {
-      S: { chest: 38.0, waist: 36.0, shoulder: 16.5, length: 28.0 },
-      M: { chest: 40.0, waist: 38.0, shoulder: 17.5, length: 29.0 },
-      L: { chest: 42.0, waist: 40.0, shoulder: 18.5, length: 30.0 },
-      XL: { chest: 44.0, waist: 42.0, shoulder: 19.5, length: 31.0 },
-    },
-    provenance: "cached",
-    image_url: "https://images.unsplash.com/photo-1596755094514-f87e34085b2c?auto=format&fit=crop&w=800&q=80",
-    description: "Tailored from French flax yarn. Breathable weave with 1.5% natural ease stretch for all-day comfort.",
-  },
-  "SKU-03": {
-    id: "SKU-03",
-    name: "Raw Indigo Denim Trucker Jacket",
-    category: "Outerwear",
-    price_inr: 3299,
-    fabric_stretch: "non_stretch",
-    fabric_composition: "100% Heavyweight Cotton Denim · 13.5 oz",
-    has_shoulder: true,
-    has_sleeve: false, // Intentionally missing sleeve measurement (ADR-004, ADR-013)
-    length_inches: 26.0,
-    sizes_json: {
-      S: { chest: 40.0, waist: 38.0, shoulder: 17.0, length: 25.0 },
-      M: { chest: 42.0, waist: 40.0, shoulder: 18.0, length: 26.0 },
-      L: { chest: 44.0, waist: 42.0, shoulder: 19.0, length: 27.0 },
-      XL: { chest: 46.0, waist: 44.0, shoulder: 20.0, length: 28.0 },
-    },
-    provenance: "manual_fixture",
-    image_url: "https://images.unsplash.com/photo-1576995853123-5a10305d93c0?auto=format&fit=crop&w=800&q=80",
-    description: "Rugged sanforized raw denim. Sizing engine flags missing sleeve length and safely alerts shoppers.",
-  },
-  "SKU-04": {
-    id: "SKU-04",
-    name: "Flowy Floral Rayon Tiered Maxi Dress",
-    category: "Women's Western",
-    price_inr: 2199,
-    fabric_stretch: "slight_stretch",
-    fabric_composition: "100% Viscose Rayon Crepe · 110 GSM",
-    has_shoulder: true,
-    has_sleeve: true,
-    length_inches: 53.0,
-    sizes_json: {
-      S: { chest: 34.0, waist: 26.0, shoulder: 14.0, length: 52.0 },
-      M: { chest: 36.0, waist: 28.0, shoulder: 15.0, length: 53.0 },
-      L: { chest: 38.0, waist: 30.0, shoulder: 16.0, length: 54.0 },
-      XL: { chest: 40.0, waist: 32.0, shoulder: 17.0, length: 55.0 },
-    },
-    provenance: "cached",
-    image_url: "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?auto=format&fit=crop&w=800&q=80",
-    description: "Floor-length silhouette with smocked bodice and tiered hem. Lightweight drape with generous hip allowance.",
-  },
-};
+type GalleryView = "full" | "macro" | "lower";
+
+const GALLERY_VIEWS: readonly { id: GalleryView; label: string }[] = [
+  { id: "full", label: "Lookbook" },
+  { id: "macro", label: "Textile Macro" },
+  { id: "lower", label: "Silhouette & Hem" },
+];
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -105,275 +53,399 @@ export default function ProductDetailPage() {
 
   const [sku, setSku] = useState<SkuResponse | null>(null);
   const [notFound, setNotFound] = useState(false);
-  const [selectedSize, setSelectedSize] = useState<string>("M");
+  const [selectedSize, setSelectedSize] = useState<SizeLabel>("M");
+  const [activeView, setActiveView] = useState<GalleryView>("full");
   const [addedToast, setAddedToast] = useState(false);
   const [bracketingWarning, setBracketingWarning] = useState(false);
 
-  const { openFitDrawer, fitResult, cart, addToCart } = useStore();
+  const { openFitDrawer, fitBySku, fitInputsBySku, cart, addToCart } = useStore();
+  const scopedFit = fitBySku[skuId];
+  const scopedInput = fitInputsBySku[skuId];
 
   useEffect(() => {
     setNotFound(false);
+    setActiveView("full");
+    setAddedToast(false);
+
+    const controller = new AbortController();
     api
-      .getSku(skuId)
+      .getSku(skuId, controller.signal)
       .then((data) => {
         setSku(data);
         setNotFound(false);
       })
       .catch(() => {
-        // Only fall back if it is one of the known curated SKUs
-        if (CURATED_DETAILS[skuId]) {
-          setSku(CURATED_DETAILS[skuId] as SkuResponse);
+        if (controller.signal.aborted) return;
+        const fallback = FALLBACK_CATALOG_SKUS.find((s) => s.id === skuId);
+        if (fallback) {
+          setSku(fallback);
           setNotFound(false);
         } else {
           setNotFound(true);
           setSku(null);
         }
       });
+
+    return () => controller.abort();
   }, [skuId]);
 
-  // Synchronize recommended size if user computed fit
   useEffect(() => {
-    if (fitResult?.recommended_size) {
-      setSelectedSize(fitResult.recommended_size);
+    if (scopedFit?.recommended_size) {
+      setSelectedSize(scopedFit.recommended_size as SizeLabel);
     }
-  }, [fitResult]);
+  }, [scopedFit]);
 
   if (notFound) {
     return (
       <div className="min-h-screen bg-canvas text-ink flex flex-col">
+        <AnnouncementBar />
         <Navbar />
-        <main className="max-w-4xl mx-auto px-4 py-16 flex-1 flex flex-col items-center justify-center text-center">
-          <div className="p-4 bg-brand/10 text-brand rounded-full mb-4">
-            <AlertCircle className="w-8 h-8" />
+        <main
+          id="main-content"
+          className="max-w-3xl mx-auto px-4 py-20 flex-1 flex flex-col items-center justify-center text-center"
+        >
+          <div className="p-4 bg-brand-soft text-brand rounded-full mb-4">
+            <AlertCircle className="w-8 h-8" aria-hidden="true" />
           </div>
-          <h1 className="text-2xl font-bold text-ink mb-2">Product Not Found</h1>
-          <p className="text-sm text-inkMuted max-w-md mb-6">
+          <h1 className="font-display text-3xl text-ink mb-2">Product Not Found</h1>
+          <p className="text-sm text-ink-muted max-w-md mb-6 leading-relaxed">
             We could not find the garment catalog entry for{" "}
-            <span className="font-mono font-bold text-ink">{skuId}</span>. It may
-            have been retired or does not exist.
+            <span className="font-mono font-semibold text-ink">{skuId}</span>. It may have been
+            retired or does not exist.
           </p>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-brand text-white text-sm font-semibold hover:bg-brandHover transition-colors shadow-sm"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-brand text-white text-sm font-semibold hover:bg-brandHover transition-colors shadow-sm"
           >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Storefront
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+            <span>Back to Storefront</span>
           </Link>
         </main>
+        <Footer />
       </div>
     );
   }
 
   if (!sku) {
     return (
-      <div className="min-h-screen bg-canvas flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-canvas text-ink flex flex-col">
+        <AnnouncementBar />
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
       </div>
     );
   }
 
-  const fallbackMeta = CURATED_DETAILS[sku.id] ?? CURATED_DETAILS["SKU-01"]!;
-  const availableSizes = sku.sizes_json ? Object.keys(sku.sizes_json) : ["S", "M", "L", "XL"];
+  const meta = getSkuDisplayMeta(sku);
+  const sizeOptions: RadioChipOption<SizeLabel>[] = ALL_SIZES.map((size) => {
+    const stocked = isSizeStocked(sku, size);
+    return {
+      value: size,
+      label: size,
+      disabled: !stocked,
+      tooltip: stocked ? `Select size ${size}` : "Not stocked for this garment",
+    };
+  });
+
+  const isFitMatch = Boolean(scopedFit && selectedSize === scopedFit.recommended_size);
+  const isFitMismatch = Boolean(scopedFit && selectedSize !== scopedFit.recommended_size);
 
   const handleAddToCart = () => {
-    // Check bracketing suppression per BUILD_PLAN Phase 4 (E12):
-    // Alert if shopper has already added a different size of the same SKU
     const existingSameSkuOtherSize = cart.some(
       (item) => item.sku.id === sku.id && item.size !== selectedSize,
     );
-
-    if (existingSameSkuOtherSize) {
-      setBracketingWarning(true);
-    } else {
-      setBracketingWarning(false);
-    }
+    setBracketingWarning(existingSameSkuOtherSize);
 
     addToCart({
       sku,
       size: selectedSize,
       quantity: 1,
-      fitVerified: !!fitResult,
+      fitVerified: Boolean(scopedFit),
+      knownBrand: scopedInput?.brand,
+      knownSize: scopedInput?.size,
+      fitPreference: scopedInput?.preference,
     });
     setAddedToast(true);
-    setTimeout(() => setAddedToast(false), 3500);
+    toast.success(`Added ${sku.name} (Size ${selectedSize}) to bag`);
+    setTimeout(() => setAddedToast(false), 4000);
   };
 
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col">
+      <AnnouncementBar />
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1">
-        {/* Breadcrumb Back */}
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-inkMuted hover:text-brand transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back to Apparel Collection
-          </Link>
-        </div>
+      <main
+        id="main-content"
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-28 lg:pb-16 flex-1 w-full"
+      >
+        {/* Editorial Breadcrumb */}
+        <nav aria-label="Breadcrumb" className="mb-6">
+          <ol className="flex flex-wrap items-center gap-1.5 text-xs text-ink-muted">
+            <li>
+              <Link href="/" className="hover:text-ink transition-colors">
+                Storefront
+              </Link>
+            </li>
+            <li aria-hidden="true">
+              <ChevronRight className="w-3.5 h-3.5" />
+            </li>
+            <li>{sku.category}</li>
+            <li aria-hidden="true">
+              <ChevronRight className="w-3.5 h-3.5" />
+            </li>
+            <li
+              aria-current="page"
+              className="text-ink font-medium truncate max-w-[240px] sm:max-w-none"
+            >
+              {sku.name}
+            </li>
+          </ol>
+        </nav>
 
-        {/* PDP Layout Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          {/* Left Column: Product Gallery */}
-          <div className="lg:col-span-6 space-y-4">
-            <div className="rounded-bento border border-border bg-surface overflow-hidden shadow-bento aspect-square relative">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={fallbackMeta.image_url}
-                alt={sku.name}
-                className="w-full h-full object-cover"
+        {/* Editorial Split (7/5 across md+ and lg+) */}
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Left: Garment Plate + 3 Detail Thumbnails */}
+          <div className="md:col-span-7 space-y-4">
+            <div className="group relative rounded-2xl border border-line bg-surface overflow-hidden shadow-card">
+              <GarmentImage
+                src={activeView === "macro" ? meta.detailImage : meta.image}
+                alt={
+                  activeView === "macro"
+                    ? meta.detailAlt
+                    : `${meta.imageAlt} — ${GALLERY_VIEWS.find((v) => v.id === activeView)?.label ?? "Lookbook"}`
+                }
+                garmentName={sku.name}
+                cropMode={activeView === "lower" ? "lower" : "full"}
+                hoverZoom={activeView === "full"}
+                priority
+                className="aspect-[3/4] w-full"
               />
               <div className="absolute top-4 left-4">
                 <Badge variant="brand">{sku.id}</Badge>
               </div>
               <div className="absolute top-4 right-4">
-                <ProvenanceBadge provenance={sku.provenance} />
+                <ProvenanceBadge provenance={sku.provenance} className="bg-surface/95 backdrop-blur-md" />
               </div>
+            </div>
+
+            <div
+              role="group"
+              aria-label="Garment angle views"
+              className="grid grid-cols-3 gap-3 sm:gap-4"
+            >
+              {GALLERY_VIEWS.map((view) => {
+                const active = activeView === view.id;
+                return (
+                  <button
+                    key={view.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => setActiveView(view.id)}
+                    className={cn(
+                      "rounded-xl overflow-hidden border bg-surface text-left transition-all cursor-pointer",
+                      active ? "border-brand ring-1 ring-brand/40 shadow-sm" : "border-line hover:border-line-strong",
+                    )}
+                  >
+                    <GarmentImage
+                      src={view.id === "macro" ? meta.detailImage : meta.image}
+                      alt={`${sku.name} — ${view.label}`}
+                      garmentName={sku.name}
+                      cropMode={view.id === "lower" ? "lower" : "full"}
+                      className="aspect-[4/3] w-full"
+                    />
+                    <span
+                      className={cn(
+                        "block px-3 py-2 text-xs font-medium text-center",
+                        active ? "text-brand bg-brand-soft/40" : "text-ink-muted",
+                      )}
+                    >
+                      {view.label}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Right Column: Garment Specs, Size Selector & Fit Action */}
-          <div className="lg:col-span-6 space-y-6">
-            <div>
-              <span className="text-xs font-bold uppercase tracking-wider text-inkMuted block">
-                {sku.category}
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-ink mt-1">
+          {/* Right: Sticky Purchase Module */}
+          <div className="md:col-span-5 md:sticky md:top-24 space-y-6">
+            <div className="space-y-2.5">
+              <p className="text-xs font-medium text-ink-muted">{sku.category}</p>
+              <h1 className="font-display text-3xl sm:text-4xl text-ink leading-tight">
                 {sku.name}
               </h1>
-              <div className="text-2xl font-extrabold text-brand mt-2">
-                ₹{Number(sku.price_inr).toLocaleString("en-IN")}
-                <span className="text-xs font-normal text-inkMuted ml-2">Inclusive of all taxes</span>
-              </div>
-            </div>
+              <p className="text-2xl font-semibold text-ink tabular-nums">
+                {formatInr(sku.price_inr)}
+                <span className="ml-2 text-xs font-normal text-ink-muted">
+                  Inclusive of all taxes
+                </span>
+              </p>
 
-            {/* Fabric Badges */}
-            <div className="p-4 rounded-bento border border-border bg-surface space-y-2">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-inkMuted block">
-                Fabric &amp; Silhouette Architecture
-              </span>
-              <div className="flex flex-wrap gap-2 text-xs">
-                <span className="px-2.5 py-1 rounded-md bg-canvas border border-border font-semibold">
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <span className="inline-flex items-center rounded-lg border border-line-strong bg-subtle px-2.5 py-1 text-xs font-medium text-ink">
                   {sku.fabric_composition}
                 </span>
-                <span className="px-2.5 py-1 rounded-md bg-canvas border border-border font-semibold capitalize">
-                  Stretch: {sku.fabric_stretch.replace("_", " ")}
+                <span
+                  className={cn(
+                    "inline-flex items-center rounded-lg border px-2.5 py-1 text-xs font-medium",
+                    sku.fabric_stretch === "non_stretch"
+                      ? "bg-warn-soft border-warn/35 text-warn-text"
+                      : "bg-trust-soft border-trust/25 text-trust-text",
+                  )}
+                >
+                  {meta.stretchNote}
                 </span>
-                {sku.length_inches && (
-                  <span className="px-2.5 py-1 rounded-md bg-canvas border border-border font-semibold">
-                    Length: {sku.length_inches}&quot;
-                  </span>
-                )}
               </div>
             </div>
 
-            {/* Sizing & Check My Fit Hero Section */}
-            <div className="p-5 rounded-bento border-2 border-border bg-surface space-y-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-sm font-bold text-ink">Select Garment Size</h3>
-                  <p className="text-xs text-inkMuted">Based on body measurements or brand conversion</p>
-                </div>
-
-                {/* Sizing Button CTA */}
-                <Button
-                  type="button"
-                  onClick={openFitDrawer}
-                  className="bg-brand text-white hover:bg-brandHover shadow-sm"
-                  size="sm"
-                >
-                  <Sparkles className="w-3.5 h-3.5 mr-1.5" />
-                  Check My Fit
-                </Button>
-              </div>
-
-              {/* Size Buttons */}
-              <div className="grid grid-cols-4 gap-2">
-                {availableSizes.map((size) => {
-                  const isSelected = selectedSize === size;
-                  const isRecommended = fitResult?.recommended_size === size;
-                  return (
-                    <button
-                      key={size}
-                      type="button"
-                      onClick={() => setSelectedSize(size)}
-                      className={`relative py-3 rounded-lg font-bold text-xs border text-center transition-all ${
-                        isSelected
-                          ? "bg-brand text-white border-brand shadow-sm scale-102"
-                          : "bg-surface border-border text-ink hover:bg-canvas"
-                      }`}
-                    >
-                      {size}
-                      {isRecommended && (
-                        <span className="absolute -top-2 right-1 px-1.5 py-0.2 bg-accentEmerald text-white text-[9px] rounded-full font-extrabold shadow-xs">
-                          Fit-Twin
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Fit Result pill if available */}
-              {fitResult && (
-                <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-accentEmerald" />
-                    <span>
-                      Fit-Twin Verified: <strong>Size {fitResult.recommended_size}</strong> ({fitResult.confidence_level} Confidence)
-                    </span>
+            {/* Scoped Fit-Twin Verification Banner */}
+            <div aria-live="polite">
+              {isFitMatch && scopedFit && (
+                <div className="rounded-2xl border border-trust/35 bg-trust-soft px-4 py-3.5 flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <CheckCircle2 className="w-4 h-4 text-trust shrink-0 mt-0.5" aria-hidden="true" />
+                    <p className="text-xs sm:text-sm font-medium text-trust-text leading-snug">
+                      Fit-Twin Verified: <strong>Size {scopedFit.recommended_size}</strong> (
+                      {scopedFit.confidence_level} Confidence)
+                    </p>
                   </div>
                   <button
                     type="button"
                     onClick={openFitDrawer}
-                    className="text-[11px] underline font-bold text-emerald-800"
+                    className="text-xs font-semibold text-trust-text underline underline-offset-4 whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     Adjust
                   </button>
                 </div>
               )}
 
-              {/* Add to Cart CTA */}
-              <div className="space-y-2 pt-2">
-                <Button
-                  type="button"
-                  onClick={handleAddToCart}
-                  className="w-full bg-ink hover:bg-ink/90 text-white"
-                  size="lg"
-                >
-                  <ShoppingBag className="w-4 h-4 mr-2" />
-                  Add Size {selectedSize} to Cart
-                </Button>
-
-                {addedToast && (
-                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold text-center animate-in fade-in">
-                    ✓ Added to cart! Proceed to checkout to review delivery assurance.
+              {isFitMismatch && scopedFit && (
+                <div className="rounded-2xl border border-warn/40 bg-warn-soft px-4 py-3.5 flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-warn shrink-0 mt-0.5" aria-hidden="true" />
+                    <p className="text-xs sm:text-sm font-medium text-warn-text leading-snug">
+                      Fit-Twin recommended Size {scopedFit.recommended_size}; you selected Size{" "}
+                      {selectedSize}.
+                    </p>
                   </div>
-                )}
-
-                {/* Bracketing Warning per BUILD_PLAN Phase 4 */}
-                {bracketingWarning && (
-                  <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-start gap-2">
-                    <AlertCircle className="w-4 h-4 text-accentAmber shrink-0 mt-0.5" />
-                    <div>
-                      <strong className="block">Multi-Size Cart Detected (Bracketing)</strong>
-                      You have added multiple sizes of this garment to your cart. Sizing engine recommends selecting one verified size to ensure dispatch priority.
-                    </div>
-                  </div>
-                )}
-              </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedSize(scopedFit.recommended_size as SizeLabel)}
+                  >
+                    Switch to {scopedFit.recommended_size}
+                  </Button>
+                </div>
+              )}
             </div>
 
-            {/* Catalog Intelligence Panel (ADR-004) */}
-            <CatalogIntelligencePanel sku={sku} />
+            {/* Size Selection */}
+            <div className="rounded-2xl border border-line bg-surface p-5 space-y-4 shadow-card">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-sm font-semibold text-ink">Select Garment Size</span>
+                {!sku.has_sleeve && (
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-warn/35 bg-warn-soft px-2.5 py-1 text-xs font-medium text-warn-text">
+                    <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0" aria-hidden="true" />
+                    Data Gap: Missing Sleeve Dimensions
+                  </span>
+                )}
+              </div>
+
+              <RadioChipGroup
+                ariaLabel="Select Garment Size"
+                options={sizeOptions}
+                value={selectedSize}
+                onChange={(size) => {
+                  setSelectedSize(size);
+                  setAddedToast(false);
+                }}
+                layout="grid-6"
+              />
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                <Button
+                  type="button"
+                  variant={isFitMatch ? "outline" : "primary"}
+                  size="lg"
+                  onClick={openFitDrawer}
+                  className="flex-1"
+                >
+                  <Sparkles className="w-4 h-4" aria-hidden="true" />
+                  <span>{isFitMatch ? "Re-check Fit" : "Check My Fit"}</span>
+                </Button>
+
+                <Button
+                  type="button"
+                  variant={isFitMatch ? "primary" : "outline"}
+                  size="lg"
+                  onClick={handleAddToCart}
+                  className="flex-1"
+                >
+                  <ShoppingBag className="w-4 h-4" aria-hidden="true" />
+                  <span>
+                    {isFitMatch
+                      ? `Add Size ${selectedSize} (Fit Verified)`
+                      : `Add Size ${selectedSize} to Cart`}
+                  </span>
+                </Button>
+              </div>
+
+              {addedToast && (
+                <Link
+                  href="/checkout"
+                  className="w-full inline-flex items-center justify-center gap-2 min-h-[46px] px-6 rounded-full bg-trust text-white text-sm font-semibold hover:bg-trust-text transition-colors"
+                >
+                  <span>Proceed to Checkout</span>
+                  <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                </Link>
+              )}
+
+              {bracketingWarning && (
+                <div className="p-3 rounded-xl bg-warn-soft border border-warn/35 text-warn-text text-xs flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 text-warn shrink-0 mt-0.5" aria-hidden="true" />
+                  <div>
+                    <strong className="block">Multi-Size Cart Detected (Bracketing)</strong>
+                    You have multiple sizes of this garment in your bag. Selecting one verified
+                    size helps keep return rates near zero.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Catalog Intelligence Accordion */}
+            <ErrorBoundary title="Catalog Intelligence panel unavailable">
+              <CatalogIntelligencePanel
+                sku={sku}
+                selectedSize={selectedSize}
+                recommendedSize={scopedFit?.recommended_size ?? null}
+                onSkuUpdated={setSku}
+              />
+            </ErrorBoundary>
           </div>
         </div>
       </main>
 
-      {/* Check My Fit Slide-over Drawer */}
-      <FitDrawer sku={sku} />
+      {/* Mobile Sticky Purchase Bar */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-line bg-surface/95 backdrop-blur-md px-4 py-2.5 shadow-lift">
+        <div className="flex items-center gap-2.5 max-w-lg mx-auto">
+          <Button type="button" variant="outline" size="sm" onClick={openFitDrawer}>
+            Check My Fit
+          </Button>
+          <Button type="button" variant="primary" size="sm" fullWidth onClick={handleAddToCart}>
+            Add Size {selectedSize} ({formatInr(sku.price_inr)})
+          </Button>
+        </div>
+      </div>
+
+      <Footer />
+
+      <ErrorBoundary title="Fit drawer encountered an error">
+        <FitDrawer sku={sku} />
+      </ErrorBoundary>
     </div>
   );
 }

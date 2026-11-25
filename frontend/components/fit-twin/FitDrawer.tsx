@@ -1,18 +1,39 @@
 "use client";
 
 import React, { useState } from "react";
-import { X, Sparkles, Shield, AlertTriangle, ArrowRight } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { X, Sparkles, Shield, AlertTriangle, ArrowRight, CheckCircle2 } from "lucide-react";
 import type { SkuResponse, BrandName, SizeLabel, FitPreference } from "@/lib/api/types";
 import { api } from "@/lib/api/client";
 import { useStore } from "@/lib/store";
+import { cmToFeetInches } from "@/lib/format";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { RadioChipGroup, type RadioChipOption } from "@/components/ui/RadioChipGroup";
 import { FitZoneBreakdown } from "./FitZoneBreakdown";
-import { cn } from "@/lib/cn";
 
 export interface FitDrawerProps {
   sku: SkuResponse;
 }
+
+const BRAND_OPTIONS: readonly RadioChipOption<BrandName>[] = [
+  { value: "Zara", label: "Zara" },
+  { value: "H&M", label: "H&M" },
+  { value: "Uniqlo", label: "Uniqlo" },
+  { value: "Levi's", label: "Levi's" },
+  { value: "Marks & Spencer", label: "Marks & Spencer" },
+];
+
+const SIZE_OPTIONS: readonly RadioChipOption<SizeLabel>[] = (
+  ["XS", "S", "M", "L", "XL", "XXL"] as const
+).map((s) => ({ value: s, label: s }));
+
+const FIT_PREF_OPTIONS: readonly RadioChipOption<FitPreference>[] = [
+  { value: "tight", label: "Tight", sublabel: '+1.0" close cut' },
+  { value: "tailored", label: "Regular", sublabel: '+2.5" tailored' },
+  { value: "relaxed", label: "Relaxed", sublabel: '+4.0" easy drape' },
+  { value: "oversized", label: "Oversized", sublabel: '+6.0" generous' },
+];
 
 export function FitDrawer({ sku }: FitDrawerProps) {
   const {
@@ -27,7 +48,8 @@ export function FitDrawer({ sku }: FitDrawerProps) {
     heightCm,
     setHeightCm,
     fitResult,
-    setFitResult,
+    fitBySku,
+    setFitForSku,
     addToCart,
   } = useStore();
 
@@ -36,14 +58,8 @@ export function FitDrawer({ sku }: FitDrawerProps) {
 
   if (!fitDrawerOpen) return null;
 
-  const brands: BrandName[] = ["Zara", "H&M", "Uniqlo"];
-  const sizes: SizeLabel[] = ["XS", "S", "M", "L", "XL", "XXL"];
-  const preferences: { key: FitPreference; label: string }[] = [
-    { key: "tight", label: "Tight" },
-    { key: "tailored", label: "Regular" }, // UI label "Regular" per BUILD_PLAN Phase 4
-    { key: "relaxed", label: "Relaxed" },
-    { key: "oversized", label: "Oversized" },
-  ];
+  const activeFitResult =
+    fitBySku[sku.id] ?? (fitResult?.sku_id === sku.id ? fitResult : null);
 
   const handleCalculateFit = async () => {
     setIsLoading(true);
@@ -55,7 +71,12 @@ export function FitDrawer({ sku }: FitDrawerProps) {
         fit_preference: fitPreference,
         height_cm: heightCm,
       });
-      setFitResult(res);
+      setFitForSku(sku.id, res, {
+        brand: selectedBrand,
+        size: selectedSize,
+        preference: fitPreference,
+        heightCm,
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to calculate fit recommendation");
     } finally {
@@ -64,10 +85,10 @@ export function FitDrawer({ sku }: FitDrawerProps) {
   };
 
   const handleApplySizeAndAddToCart = () => {
-    if (!fitResult) return;
+    if (!activeFitResult) return;
     addToCart({
       sku,
-      size: fitResult.recommended_size,
+      size: activeFitResult.recommended_size,
       quantity: 1,
       fitVerified: true,
       knownBrand: selectedBrand,
@@ -84,206 +105,216 @@ export function FitDrawer({ sku }: FitDrawerProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-ink/40 backdrop-blur-sm transition-opacity"
-        onClick={closeFitDrawer}
-      />
-
-      {/* Slide-over panel */}
-      <div className="fixed inset-y-0 right-0 max-w-full flex pl-10">
-        <div className="w-screen max-w-md bg-surface border-l border-border shadow-2xl flex flex-col">
+    <Dialog.Root
+      open={fitDrawerOpen}
+      onOpenChange={(open) => {
+        if (!open) closeFitDrawer();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="rz-overlay-in fixed inset-0 z-50 bg-ink/40 backdrop-blur-[2px]" />
+        <Dialog.Content
+          aria-describedby="fit-drawer-description"
+          className="rz-drawer-in fixed right-0 top-0 bottom-0 z-50 w-full sm:w-[480px] bg-surface border-l border-line shadow-lift flex flex-col outline-none"
+        >
           {/* Drawer Header */}
-          <div className="p-5 border-b border-borderLight flex items-center justify-between bg-canvas/40">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-brand text-white flex items-center justify-center">
-                <Sparkles className="w-4 h-4" />
-              </div>
-              <div>
-                <h2 className="text-base font-bold text-ink">Check My Fit</h2>
-                <p className="text-xs text-inkMuted">Deterministic Sizing Intelligence</p>
-              </div>
+          <div className="px-6 py-5 border-b border-line flex items-start justify-between gap-4 bg-subtle/60">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold text-brand">Deterministic Sizing Engine</p>
+              <Dialog.Title className="font-display text-2xl text-ink leading-tight">
+                Check My Fit
+              </Dialog.Title>
+              <Dialog.Description id="fit-drawer-description" className="text-xs text-ink-muted">
+                {sku.name} — {sku.fabric_stretch.replace("_", " ")}
+              </Dialog.Description>
             </div>
-            <button
-              type="button"
-              onClick={closeFitDrawer}
-              className="p-1.5 rounded-lg text-inkMuted hover:text-ink hover:bg-canvas transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <Dialog.Close asChild>
+              <button
+                type="button"
+                onClick={closeFitDrawer}
+                aria-label="Close Check My Fit drawer"
+                className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full border border-line-strong text-ink-muted hover:text-ink hover:bg-surface transition-colors cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" aria-hidden="true" />
+              </button>
+            </Dialog.Close>
           </div>
 
           {/* Drawer Body */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-5">
-            {/* Privacy Guarantee Banner (ADR-004) */}
-            <div className="p-3 rounded-lg bg-canvas border border-borderLight flex items-center gap-2.5 text-xs text-inkMuted">
-              <Shield className="w-4 h-4 text-brand shrink-0" />
+          <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            <div className="p-3.5 rounded-2xl bg-subtle border border-line flex items-center gap-2.5 text-xs text-ink-muted">
+              <Shield className="w-4 h-4 text-brand shrink-0" aria-hidden="true" />
               <span>
-                <strong className="text-ink">No photos required.</strong> We calculate sizing using verified brand measurement tables.
+                <strong className="text-ink">No photos required.</strong> Calculated from verified
+                brand size matrices and weave ease rules.
               </span>
             </div>
 
-            {/* Step 1: Known Brand */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-inkMuted mb-2">
-                1. Your best-fitting reference brand
-              </label>
-              <div className="grid grid-cols-3 gap-2">
-                {brands.map((b) => (
-                  <button
-                    key={b}
-                    type="button"
-                    onClick={() => {
-                      setSelectedBrand(b);
-                      setFitResult(null);
-                    }}
-                    className={cn(
-                      "py-2.5 px-3 rounded-lg text-xs font-bold border transition-all text-center",
-                      selectedBrand === b
-                        ? "bg-brand text-white border-brand shadow-sm"
-                        : "bg-surface border-border text-ink hover:bg-canvas",
-                    )}
-                  >
-                    {b}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-semibold text-ink">
+                1. Reference brand you know your size in
+              </legend>
+              <RadioChipGroup
+                ariaLabel="Known Brand"
+                options={BRAND_OPTIONS}
+                value={selectedBrand}
+                onChange={(b) => {
+                  setSelectedBrand(b);
+                  setFitForSku(sku.id, null);
+                }}
+                layout="wrap"
+              />
+            </fieldset>
 
-            {/* Step 2: Known Size */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-inkMuted mb-2">
-                2. Your typical size in {selectedBrand}
-              </label>
-              <div className="grid grid-cols-6 gap-1.5">
-                {sizes.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => {
-                      setSelectedSize(s);
-                      setFitResult(null);
-                    }}
-                    className={cn(
-                      "py-2 text-xs font-bold rounded-lg border transition-all text-center",
-                      selectedSize === s
-                        ? "bg-brand text-white border-brand shadow-sm"
-                        : "bg-surface border-border text-ink hover:bg-canvas",
-                    )}
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-semibold text-ink">
+                2. Your usual size in {selectedBrand}
+              </legend>
+              <RadioChipGroup
+                ariaLabel="Known Size"
+                options={SIZE_OPTIONS}
+                value={selectedSize}
+                onChange={(s) => {
+                  setSelectedSize(s);
+                  setFitForSku(sku.id, null);
+                }}
+                layout="grid-6"
+              />
+            </fieldset>
 
-            {/* Step 3: Fit Preference */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-inkMuted mb-2">
-                3. Desired fit silhouette
-              </label>
-              <div className="grid grid-cols-4 gap-1.5">
-                {preferences.map((p) => (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => {
-                      setFitPreference(p.key);
-                      setFitResult(null);
-                    }}
-                    className={cn(
-                      "py-2 px-1 text-xs font-bold rounded-lg border transition-all text-center",
-                      fitPreference === p.key
-                        ? "bg-brand text-white border-brand shadow-sm"
-                        : "bg-surface border-border text-ink hover:bg-canvas",
-                    )}
-                  >
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <fieldset className="space-y-2">
+              <legend className="text-xs font-semibold text-ink">
+                3. Desired silhouette ease
+              </legend>
+              <RadioChipGroup
+                ariaLabel="Fit Preference"
+                options={FIT_PREF_OPTIONS}
+                value={fitPreference}
+                onChange={(p) => {
+                  setFitPreference(p);
+                  setFitForSku(sku.id, null);
+                }}
+                layout="grid-2"
+              />
+            </fieldset>
 
-            {/* Step 4: Shopper Height (cm) */}
-            <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-inkMuted">
+            <div className="space-y-2.5 rounded-2xl border border-line bg-subtle p-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <label htmlFor="fit-height-slider" className="text-xs font-semibold text-ink">
                   4. Your Height
                 </label>
-                <span className="text-xs font-bold text-brand">{heightCm} cm</span>
+                <span className="text-sm font-semibold text-brand tabular-nums">
+                  {heightCm} cm ({cmToFeetInches(heightCm)})
+                </span>
               </div>
               <input
+                id="fit-height-slider"
                 type="range"
-                min="145"
-                max="195"
+                min={145}
+                max={195}
+                step={1}
                 value={heightCm}
                 onChange={(e) => {
                   setHeightCm(Number(e.target.value));
-                  setFitResult(null);
+                  setFitForSku(sku.id, null);
                 }}
-                className="w-full accent-brand cursor-pointer"
+                className="rz-slider w-full"
               />
-              <div className="flex justify-between text-[10px] text-inkMuted mt-1">
+              <div className="flex justify-between text-[11px] text-ink-muted tabular-nums">
                 <span>145 cm</span>
                 <span>170 cm</span>
                 <span>195 cm</span>
               </div>
             </div>
 
-            {/* Calculate CTA */}
             <Button
               type="button"
               onClick={handleCalculateFit}
               isLoading={isLoading}
-              className="w-full"
+              fullWidth
               size="lg"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
-              Analyze Sizing for This Garment
+              <Sparkles className="w-4 h-4" aria-hidden="true" />
+              <span>Analyze Sizing for This Garment</span>
             </Button>
 
             {error && (
-              <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs">
+              <div
+                role="alert"
+                className="p-3.5 rounded-xl bg-danger-soft border border-danger/25 text-danger text-xs font-medium"
+              >
                 {error}
               </div>
             )}
 
-            {/* Sizing Recommendation Result Card */}
-            {fitResult && (
-              <div className="rounded-bento border-2 border-brand bg-surface p-4 space-y-4 shadow-bento animate-in fade-in duration-300">
-                <div className="flex items-start justify-between">
+            {activeFitResult && (
+              <div
+                aria-live="polite"
+                className="rounded-2xl border border-brand/35 bg-surface p-5 space-y-4 shadow-card"
+              >
+                <div className="flex items-start justify-between gap-4">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-inkMuted">
+                    <span className="text-[11px] font-medium text-ink-muted">
                       Recommended Size
                     </span>
-                    <div className="text-3xl font-extrabold text-brand mt-0.5">
-                      Size {fitResult.recommended_size}
+                    <div className="font-display text-4xl text-brand mt-0.5">
+                      Size {activeFitResult.recommended_size}
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <Badge variant={getConfidenceBadgeVariant(activeFitResult.confidence_level)}>
+                        {activeFitResult.confidence_level} Confidence
+                      </Badge>
+                      <span className="text-[11px] text-ink-muted inline-flex items-center gap-1">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-trust" aria-hidden="true" />
+                        Stocked
+                      </span>
                     </div>
                   </div>
-                  <div className="text-right space-y-1">
-                    <Badge variant={getConfidenceBadgeVariant(fitResult.confidence_level)}>
-                      {fitResult.confidence_level} Confidence
-                    </Badge>
-                    <div className="text-[10px] text-inkMuted">
-                      Score: {fitResult.fit_score}/100
+
+                  {/* Circular Heuristic Fit Score */}
+                  <div className="flex flex-col items-center shrink-0">
+                    <div className="relative h-14 w-14 flex items-center justify-center">
+                      <svg viewBox="0 0 36 36" className="h-14 w-14 -rotate-90" aria-hidden="true">
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="15.5"
+                          fill="none"
+                          stroke="#E8DFF5"
+                          strokeWidth="3"
+                        />
+                        <circle
+                          cx="18"
+                          cy="18"
+                          r="15.5"
+                          fill="none"
+                          stroke="#6D28D9"
+                          strokeWidth="3"
+                          strokeDasharray={`${Math.min(100, activeFitResult.fit_score)} 100`}
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <span className="absolute text-xs font-bold text-ink tabular-nums">
+                        {activeFitResult.fit_score}
+                      </span>
                     </div>
+                    <span className="text-[10px] text-ink-muted tabular-nums mt-0.5">
+                      Score: {activeFitResult.fit_score}/100
+                    </span>
                   </div>
                 </div>
 
-                {/* Explanation text */}
-                <p className="text-xs text-ink bg-canvas/50 p-2.5 rounded-lg border border-borderLight leading-relaxed">
-                  {fitResult.explanation_text}
+                <p className="text-xs text-ink bg-subtle p-3 rounded-xl border border-line leading-relaxed">
+                  {activeFitResult.explanation_text}
                 </p>
 
-                {/* Missing data warnings if any */}
-                {fitResult.missing_data_warnings.length > 0 && (
-                  <div className="p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-xs space-y-1">
-                    <div className="font-bold flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5 text-accentAmber" />
-                      Measurement Notices
+                {activeFitResult.missing_data_warnings.length > 0 && (
+                  <div className="p-3 rounded-xl bg-warn-soft border border-warn/35 text-warn-text text-xs space-y-1">
+                    <div className="font-semibold flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5 text-warn shrink-0" aria-hidden="true" />
+                      <span>Measurement Notices</span>
                     </div>
-                    {fitResult.missing_data_warnings.map((w, idx) => (
+                    {activeFitResult.missing_data_warnings.map((w, idx) => (
                       <p key={idx} className="text-[11px] leading-snug">
                         {w}
                       </p>
@@ -291,26 +322,25 @@ export function FitDrawer({ sku }: FitDrawerProps) {
                   </div>
                 )}
 
-                {/* Zone Breakdown */}
-                {fitResult.fit_zone_breakdown && (
-                  <FitZoneBreakdown breakdown={fitResult.fit_zone_breakdown} />
+                {activeFitResult.fit_zone_breakdown && (
+                  <FitZoneBreakdown breakdown={activeFitResult.fit_zone_breakdown} />
                 )}
 
-                {/* Apply size CTA */}
                 <Button
                   type="button"
                   onClick={handleApplySizeAndAddToCart}
-                  className="w-full bg-accentEmerald hover:bg-emerald-700 text-white"
+                  fullWidth
                   size="md"
+                  className="bg-trust hover:bg-trust-text text-white"
                 >
-                  Apply Size {fitResult.recommended_size} &amp; Add to Cart
-                  <ArrowRight className="w-4 h-4 ml-1.5" />
+                  <span>Apply Size {activeFitResult.recommended_size} &amp; Add to Cart</span>
+                  <ArrowRight className="w-4 h-4" aria-hidden="true" />
                 </Button>
               </div>
             )}
           </div>
-        </div>
-      </div>
-    </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

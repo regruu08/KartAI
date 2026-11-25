@@ -1,63 +1,67 @@
 "use client";
 
-import React, { Component, type ErrorInfo, type ReactNode } from "react";
-import { AlertCircle, RotateCcw } from "lucide-react";
-import { Button } from "./Button";
+import React from "react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+  title?: string;
+  fallbackDescription?: string;
 }
 
-interface State {
+interface ErrorBoundaryState {
   hasError: boolean;
-  error: Error | null;
+  errorMessage: string | null;
 }
 
-export class ErrorBoundary extends Component<Props, State> {
-  public override state: State = {
-    hasError: false,
-    error: null,
-  };
-
-  public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+/**
+ * Module-scoped Error Boundary so a single panel failure never triggers a white screen.
+ */
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, errorMessage: null };
   }
 
-  public override componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console in production
-    console.error("ErrorBoundary caught an unhandled error:", error, errorInfo);
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return {
+      hasError: true,
+      errorMessage: error.message || "Unexpected rendering error.",
+    };
   }
 
-  private handleReset = () => {
-    this.setState({ hasError: false, error: null });
+  handleReset = () => {
+    this.setState({ hasError: false, errorMessage: null });
   };
 
-  public override render() {
+  render() {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
       return (
-        <div className="p-6 rounded-bento border border-rose-200 bg-rose-50 text-rose-900 max-w-md mx-auto my-8 text-center space-y-3">
-          <div className="w-10 h-10 rounded-full bg-rose-100 flex items-center justify-center mx-auto text-rose-600">
-            <AlertCircle className="w-5 h-5" />
+        <div
+          role="alert"
+          className="rounded-2xl border border-danger/20 bg-danger-soft p-5 text-ink space-y-3"
+        >
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-danger shrink-0 mt-0.5" aria-hidden="true" />
+            <div className="space-y-1">
+              <h3 className="text-sm font-semibold text-ink">
+                {this.props.title ?? "This section encountered a display error"}
+              </h3>
+              <p className="text-xs text-ink-muted">
+                {this.props.fallbackDescription ??
+                  this.state.errorMessage ??
+                  "Please retry rendering this module."}
+              </p>
+            </div>
           </div>
-          <h3 className="text-sm font-bold">Something went wrong in this view</h3>
-          <p className="text-xs text-rose-700 leading-relaxed">
-            {this.state.error?.message || "An unexpected error occurred."}
-          </p>
-          <Button
+          <button
             type="button"
-            variant="outline"
-            size="sm"
             onClick={this.handleReset}
-            className="border-rose-300 text-rose-800 hover:bg-rose-100"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-surface border border-line-strong text-xs font-semibold text-ink hover:border-brand transition-colors"
           >
-            <RotateCcw className="w-3.5 h-3.5 mr-1" />
-            Try Again
-          </Button>
+            <RotateCcw className="w-3.5 h-3.5" aria-hidden="true" />
+            Retry section
+          </button>
         </div>
       );
     }

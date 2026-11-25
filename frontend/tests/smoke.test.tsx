@@ -4,7 +4,6 @@ import { describe, it, expect, vi } from "vitest";
 import StorefrontHome from "../app/page";
 import ProductDetailPage from "../app/products/[skuId]/page";
 
-// Mock next/navigation for ProductDetailPage
 let mockSkuId = "SKU-01";
 vi.mock("next/navigation", () => ({
   useParams: () => ({ skuId: mockSkuId }),
@@ -14,18 +13,31 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("Frontend Storefront Smoke Test", () => {
-  it("renders the home page hero and title", () => {
+  it("renders the home page editorial hero and guarantee banner", () => {
     render(<StorefrontHome />);
     expect(screen.getAllByText(/ReturnZero/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/D2C Fashion Storefront/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        name: /D2C Fashion Engineered for Perfect First-Time Fit/i,
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Net Monthly Savings/i)).toBeInTheDocument();
   });
 
   it("renders the 4 curated fashion apparel SKUs", () => {
     render(<StorefrontHome />);
-    expect(screen.getByText(/Chanderi Silk/i)).toBeInTheDocument();
-    expect(screen.getByText(/Mandarin Collar Linen Shirt/i)).toBeInTheDocument();
-    expect(screen.getByText(/Denim Trucker Jacket/i)).toBeInTheDocument();
-    expect(screen.getByText(/Floral Rayon/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /Handcrafted Chanderi Silk Anarkali Kurta/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /Relaxed Mandarin Collar Linen Shirt/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /Raw Indigo Denim Trucker Jacket/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /Flowy Floral Rayon Tiered Maxi Dress/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders Product Not Found for non-existent SKU", async () => {
