@@ -28,6 +28,11 @@ settings = get_settings()
 def create_session_engine(database_url: str) -> AsyncEngine:
     """Create a configured AsyncEngine for SQLite or PostgreSQL."""
     resolved_url = resolve_database_url(database_url)
+    if resolved_url.startswith("postgresql://"):
+        resolved_url = resolved_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    elif resolved_url.startswith("postgres://"):
+        resolved_url = resolved_url.replace("postgres://", "postgresql+asyncpg://", 1)
+
     engine_kwargs: dict[str, Any] = {
         "echo": False,
         "future": True,
@@ -36,6 +41,8 @@ def create_session_engine(database_url: str) -> AsyncEngine:
     if ":memory:" in resolved_url:
         engine_kwargs["poolclass"] = StaticPool
         engine_kwargs["connect_args"] = {"check_same_thread": False}
+    elif not resolved_url.startswith("sqlite"):
+        engine_kwargs["pool_pre_ping"] = True
 
     eng: AsyncEngine = create_async_engine(resolved_url, **engine_kwargs)
 

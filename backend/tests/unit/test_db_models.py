@@ -153,3 +153,14 @@ def test_utc_now_helper() -> None:
     now = utc_now()
     assert now.tzinfo is not None
     assert now.tzinfo == UTC
+
+
+def test_create_session_engine_normalizes_postgres_urls() -> None:
+    """Verify postgresql:// and postgres:// schemes normalize to postgresql+asyncpg://."""
+    from app.db.session import create_session_engine
+
+    pg_engine = create_session_engine("postgresql://user:pass@localhost:5432/returnzero")
+    assert pg_engine.url.drivername == "postgresql+asyncpg"
+
+    legacy_engine = create_session_engine("postgres://user:pass@localhost:5432/returnzero")
+    assert legacy_engine.url.drivername == "postgresql+asyncpg"
