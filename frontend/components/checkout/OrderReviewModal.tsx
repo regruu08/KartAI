@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { CheckCircle2, AlertCircle, XCircle, Zap, ShieldCheck } from "lucide-react";
 import type { RiskEvaluateResponse, IncentiveQuoteResponse } from "@/lib/api/types";
 import { Button } from "@/components/ui/Button";
@@ -32,16 +33,18 @@ export function OrderReviewModal({
   const discountAmount = incentiveData?.eligible_for_incentive
     ? Number(incentiveData.recommended_discount_inr)
     : 0;
+  const avoidedLoss = Number(incentiveData?.expected_avoided_loss_inr ?? 48);
+  const headroom = Number(incentiveData?.headroom_inr ?? 8);
   const upiPayable = Math.max(0, cartTotal - discountAmount);
 
   const getCheckIcon = (status: "PASS" | "REVIEW" | "FAIL") => {
     switch (status) {
       case "PASS":
-        return <CheckCircle2 className="w-4 h-4 text-accentEmerald shrink-0" />;
+        return <CheckCircle2 className="w-4 h-4 text-trust shrink-0" aria-hidden="true" />;
       case "REVIEW":
-        return <AlertCircle className="w-4 h-4 text-accentAmber shrink-0" />;
+        return <AlertCircle className="w-4 h-4 text-warn shrink-0" aria-hidden="true" />;
       case "FAIL":
-        return <XCircle className="w-4 h-4 text-accentRose shrink-0" />;
+        return <XCircle className="w-4 h-4 text-danger shrink-0" aria-hidden="true" />;
     }
   };
 
@@ -57,105 +60,125 @@ export function OrderReviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-ink/50 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Modal Dialog */}
-      <div className="relative w-full max-w-lg bg-surface rounded-bento border border-border shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
-        {/* Header */}
-        <div className="flex items-center gap-2.5 border-b border-borderLight pb-4">
-          <div className="w-10 h-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center">
-            <ShieldCheck className="w-5 h-5" />
+    <Dialog.Root
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <Dialog.Portal>
+        <Dialog.Overlay className="rz-overlay-in fixed inset-0 z-50 bg-ink/45 backdrop-blur-[2px]" />
+        <Dialog.Content
+          aria-describedby="order-review-description"
+          className="rz-modal-in fixed inset-0 z-50 m-auto h-fit w-[calc(100vw-2rem)] max-w-xl rounded-2xl border border-line bg-surface p-6 sm:p-7 shadow-lift outline-none space-y-5"
+        >
+          {/* Header */}
+          <div className="flex items-start gap-3 border-b border-line pb-4">
+            <div className="w-10 h-10 rounded-xl bg-brand-soft text-brand flex items-center justify-center shrink-0">
+              <ShieldCheck className="w-5 h-5" aria-hidden="true" />
+            </div>
+            <div>
+              <Dialog.Title className="font-display text-xl sm:text-2xl text-ink leading-tight">
+                Order Safety Review
+              </Dialog.Title>
+              <Dialog.Description id="order-review-description" className="text-xs text-ink-muted mt-0.5">
+                Automated logistics &amp; delivery assurance checks before dispatch
+              </Dialog.Description>
+            </div>
           </div>
-          <div>
-            <h3 className="text-base font-bold text-ink">Order Safety Review</h3>
-            <p className="text-xs text-inkMuted">Automated logistics &amp; delivery assurance checks</p>
-          </div>
-        </div>
 
-        {/* 3-Point Checklist */}
-        <div className="space-y-2.5">
-          <span className="text-xs font-bold uppercase tracking-wider text-inkMuted">
-            Pre-Dispatch Verification Checklist
-          </span>
-          <div className="space-y-2">
-            {riskData?.checks.map((c) => (
-              <div
-                key={c.id}
-                className="p-3 rounded-lg border border-border bg-canvas/40 flex items-center justify-between"
-              >
-                <div className="flex items-center gap-2.5">
-                  {getCheckIcon(c.status)}
-                  <span className="text-xs font-bold text-ink">{c.label}</span>
-                </div>
-                <span
-                  className={cn(
-                    "text-[10px] font-bold px-2 py-0.5 rounded border uppercase",
-                    getCheckBadge(c.status),
-                  )}
+          {/* 3-Point Checklist */}
+          <div className="space-y-2.5">
+            <span className="text-xs font-semibold text-ink-muted block">
+              Pre-Dispatch Verification Checklist
+            </span>
+            <div className="space-y-2">
+              {riskData?.checks.map((c) => (
+                <div
+                  key={c.id}
+                  className="p-3 rounded-xl border border-line bg-subtle/80 flex items-center justify-between gap-2"
                 >
-                  {c.status}
+                  <div className="flex items-center gap-2.5">
+                    {getCheckIcon(c.status)}
+                    <span className="text-xs font-semibold text-ink">{c.label}</span>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-[10px] font-bold px-2.5 py-0.5 rounded-full border uppercase",
+                      getCheckBadge(c.status),
+                    )}
+                  >
+                    {c.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Margin-Safe UPI Conversion Offer */}
+          {incentiveData?.eligible_for_incentive && discountAmount > 0 && (
+            <div className="rounded-2xl border border-brand/35 bg-brand-soft/35 p-4 space-y-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-brand text-white">
+                  <Zap className="w-3 h-3" aria-hidden="true" />
+                  Transparent Margin-Safe Incentive
+                </span>
+                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 tabular-nums">
+                  Save ₹{discountAmount}
                 </span>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Dynamic UPI Conversion Offer (ADR-002, ADR-014) */}
-        {incentiveData?.eligible_for_incentive && discountAmount > 0 && (
-          <div className="rounded-bento border-2 border-brand bg-brand/5 p-4 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-brand text-white">
-                <Zap className="w-3 h-3" />
-                Instant Prepaid Nudge
-              </span>
-              <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                Save ₹{discountAmount}
-              </span>
-            </div>
-            <p className="text-xs text-ink font-medium leading-relaxed">
-              {incentiveData.nudge_copy ||
-                `Convert to instant UPI to save ₹${discountAmount} and receive priority dispatch.`}
-            </p>
-            <div className="text-xs text-inkMuted flex justify-between items-center pt-1 border-t border-brand/20">
-              <span>Payable via UPI:</span>
-              <span className="text-base font-extrabold text-brand">₹{upiPayable}</span>
-            </div>
-          </div>
-        )}
+              <p className="text-xs text-ink leading-relaxed">
+                {incentiveData.nudge_copy ||
+                  `Switch to instant UPI to save ₹${discountAmount} and secure priority dispatch.`}
+              </p>
 
-        {/* Action Buttons: Equal visibility COD vs UPI per ADR-002 */}
-        <div className="space-y-2 pt-2">
-          {incentiveData?.eligible_for_incentive && discountAmount > 0 && (
-            <Button
-              type="button"
-              onClick={onAcceptUpi}
-              isLoading={isSubmitting}
-              className="w-full bg-brand hover:bg-brandHover text-white"
-              size="lg"
-            >
-              <Zap className="w-4 h-4 mr-1.5" />
-              Pay ₹{upiPayable} via Instant UPI (Simulated)
-            </Button>
+              <div className="rounded-xl bg-surface border border-line p-3 text-xs space-y-1 tabular-nums">
+                <p className="font-semibold text-brand">
+                  Avoided RTO ₹{avoidedLoss.toFixed(0)} - Margin Floor ₹{headroom.toFixed(0)} = ₹
+                  {discountAmount} Offer
+                </p>
+                <div className="flex justify-between items-center text-ink-muted pt-1 border-t border-line">
+                  <span>Payable via Instant UPI:</span>
+                  <span className="text-sm font-bold text-ink">₹{upiPayable}</span>
+                </div>
+              </div>
+            </div>
           )}
 
-          <Button
-            type="button"
-            variant="outline"
-            onClick={onConfirmCod}
-            isLoading={isSubmitting}
-            className="w-full border-border text-ink hover:bg-canvas"
-            size="md"
-          >
-            Continue with Cash on Delivery (₹{cartTotal})
-          </Button>
-        </div>
+          {/* Equal-Weight Checkout Actions */}
+          <div className="space-y-2.5 pt-1">
+            {incentiveData?.eligible_for_incentive && discountAmount > 0 && (
+              <Button
+                type="button"
+                onClick={onAcceptUpi}
+                isLoading={isSubmitting}
+                fullWidth
+                size="lg"
+              >
+                <Zap className="w-4 h-4" aria-hidden="true" />
+                <span>Pay ₹{upiPayable} via Instant UPI (Simulated)</span>
+              </Button>
+            )}
 
-        <p className="text-[10px] text-center text-inkMuted italic">
-          Fairness Guarantee: Cash on Delivery is 100% available without restrictions.
-        </p>
-      </div>
-    </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onConfirmCod}
+              isLoading={isSubmitting}
+              fullWidth
+              size="md"
+              className="border-2 border-ink text-ink hover:bg-subtle"
+            >
+              Continue with Cash on Delivery (₹{cartTotal})
+            </Button>
+          </div>
+
+          <p className="text-[11px] text-center text-ink-muted">
+            Fairness Guarantee: Cash on Delivery remains 100% available without restrictions.
+          </p>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }

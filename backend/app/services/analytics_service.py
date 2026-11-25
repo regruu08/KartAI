@@ -68,7 +68,7 @@ class AnalyticsService:
             avoided_rto_shipments=proj.avoided_rto_shipments,
             gross_avoided_loss_inr=proj.gross_avoided_cost_inr,
             total_incentives_paid_inr=proj.incentives_paid_inr,
-            total_payment_fees_inr=Decimal("0.00"),
+            total_payment_fees_inr=proj.payment_fees_inr,
             net_operating_savings_monthly_inr=proj.monthly_direct_net_savings_inr,
             net_operating_savings_annual_inr=proj.annual_direct_net_savings_inr,
         )
@@ -84,6 +84,7 @@ class AnalyticsService:
         prepaid_rto_dec = Decimal(str(request.prepaid_rto_pct)) / Decimal("100")
         conversion_dec = Decimal(str(request.cod_conversion_pct)) / Decimal("100")
         residual_dec = Decimal(str(request.residual_cod_rto_reduction_pp)) / Decimal("100")
+        fee_dec = Decimal(str(request.upi_gateway_fee_pct)) / Decimal("100")
 
         result: ScenarioResult = calculate_scenario(
             monthly_shipments=request.monthly_shipments,
@@ -94,6 +95,8 @@ class AnalyticsService:
             cod_to_prepaid_shift_pct=conversion_dec,
             incentive_per_order=request.incentive_offer_inr,
             residual_cod_rto_improvement_pp=residual_dec,
+            upi_gateway_fee_pct=fee_dec,
+            average_order_value_inr=request.average_order_value_inr,
         )
 
         return ScenarioCalculationResponse(

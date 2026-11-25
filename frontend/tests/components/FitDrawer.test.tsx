@@ -127,4 +127,18 @@ describe("FitDrawer Component", () => {
       expect(screen.getByText("Fit engine unreachable")).toBeInTheDocument();
     });
   });
+
+  it("does not bleed stale fitResult from SKU-01 into another SKU drawer", () => {
+    const otherSku: SkuResponse = { ...mockSku, id: "SKU-03", name: "Raw Indigo Denim Trucker Jacket" };
+    useStore.setState({
+      fitDrawerOpen: true,
+      fitResult: mockFitResponse, // sku_id: "SKU-01"
+      fitBySku: {},
+    });
+
+    render(<FitDrawer sku={otherSku} />);
+
+    expect(screen.queryByText(/Score: 95\/100/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Apply Size L/i)).not.toBeInTheDocument();
+  });
 });

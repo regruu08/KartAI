@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Sliders, TrendingUp, Sparkles, AlertCircle } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Sliders } from "lucide-react";
 import type { ScenarioCalculationResponse } from "@/lib/api/types";
 import { api } from "@/lib/api/client";
 import { Card } from "@/components/ui/Card";
@@ -17,47 +17,57 @@ export function ScenarioModelPanel({ className }: { className?: string }) {
   const [data, setData] = useState<ScenarioCalculationResponse | null>(null);
 
   useEffect(() => {
-    api
-      .getScenario({
-        monthly_shipments: shipments,
-        cod_share_pct: codShare,
-        cod_rto_pct: codRto,
-        cost_per_rto_inr: costPerRto,
-        cod_conversion_pct: conversionRate,
-        upi_gateway_fee_pct: feePct,
-      })
-      .then(setData)
-      .catch(() => null);
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      api
+        .getScenario(
+          {
+            monthly_shipments: shipments,
+            cod_share_pct: codShare,
+            cod_rto_pct: codRto,
+            cost_per_rto_inr: costPerRto,
+            cod_conversion_pct: conversionRate,
+            upi_gateway_fee_pct: feePct,
+          },
+          controller.signal,
+        )
+        .then(setData)
+        .catch(() => null);
+    }, 120);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [shipments, codShare, codRto, costPerRto, conversionRate, feePct]);
 
   const combined = data?.combined_case;
   const conservative = data?.conservative_conversion_only_case;
 
   return (
-    <Card className={cn("p-6 space-y-6 border-2 border-brand/40 bg-surface shadow-bento", className)}>
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-4 border-b border-borderLight">
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg bg-brand text-white flex items-center justify-center">
-            <Sliders className="w-5 h-5" />
+    <Card className={cn("p-6 space-y-6 border border-brand/30 bg-surface shadow-card", className)}>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pb-4 border-b border-line">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-brand-soft text-brand flex items-center justify-center shrink-0">
+            <Sliders className="w-5 h-5" aria-hidden="true" />
           </div>
           <div>
-            <h3 className="text-base font-extrabold text-ink">
+            <h3 className="font-display text-xl text-ink">
               10,000-Shipment Financial Scenario Modeler
             </h3>
-            <p className="text-xs text-inkMuted">
+            <p className="text-xs text-ink-muted">
               Interactive financial projections strictly segregated from live database telemetry (ADR-005)
             </p>
           </div>
         </div>
-        <span className="text-[10px] uppercase font-bold text-brand bg-canvas px-2.5 py-1 rounded-full border border-border">
+        <span className="text-xs font-semibold text-brand bg-subtle px-3 py-1 rounded-full border border-line">
           Interactive Projections
         </span>
       </div>
 
-      {/* Sliders Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-xs">
+      {/* Interactive Sliders */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 text-xs tabular-nums">
         <div>
-          <div className="flex justify-between text-inkMuted font-bold mb-1.5">
+          <div className="flex justify-between text-ink-muted font-semibold mb-1.5">
             <span>Monthly Shipments</span>
             <span className="text-ink">{shipments.toLocaleString("en-IN")}</span>
           </div>
@@ -68,12 +78,12 @@ export function ScenarioModelPanel({ className }: { className?: string }) {
             step="1000"
             value={shipments}
             onChange={(e) => setShipments(Number(e.target.value))}
-            className="w-full accent-brand cursor-pointer"
+            className="rz-slider w-full"
           />
         </div>
 
         <div>
-          <div className="flex justify-between text-inkMuted font-bold mb-1.5">
+          <div className="flex justify-between text-ink-muted font-semibold mb-1.5">
             <span>COD Volume Share</span>
             <span className="text-ink">{codShare.toFixed(1)}%</span>
           </div>
@@ -84,12 +94,12 @@ export function ScenarioModelPanel({ className }: { className?: string }) {
             step="5"
             value={codShare}
             onChange={(e) => setCodShare(Number(e.target.value))}
-            className="w-full accent-brand cursor-pointer"
+            className="rz-slider w-full"
           />
         </div>
 
         <div>
-          <div className="flex justify-between text-inkMuted font-bold mb-1.5">
+          <div className="flex justify-between text-ink-muted font-semibold mb-1.5">
             <span>Direct Cost per RTO</span>
             <span className="text-ink">₹{costPerRto}</span>
           </div>
@@ -100,12 +110,12 @@ export function ScenarioModelPanel({ className }: { className?: string }) {
             step="10"
             value={costPerRto}
             onChange={(e) => setCostPerRto(Number(e.target.value))}
-            className="w-full accent-brand cursor-pointer"
+            className="rz-slider w-full"
           />
         </div>
 
         <div>
-          <div className="flex justify-between text-inkMuted font-bold mb-1.5">
+          <div className="flex justify-between text-ink-muted font-semibold mb-1.5">
             <span>Baseline COD RTO Rate</span>
             <span className="text-ink">{codRto.toFixed(1)}%</span>
           </div>
@@ -116,12 +126,12 @@ export function ScenarioModelPanel({ className }: { className?: string }) {
             step="1"
             value={codRto}
             onChange={(e) => setCodRto(Number(e.target.value))}
-            className="w-full accent-brand cursor-pointer"
+            className="rz-slider w-full"
           />
         </div>
 
         <div>
-          <div className="flex justify-between text-inkMuted font-bold mb-1.5">
+          <div className="flex justify-between text-ink-muted font-semibold mb-1.5">
             <span>COD → UPI Conversion Rate</span>
             <span className="text-ink">{conversionRate.toFixed(1)}%</span>
           </div>
@@ -132,12 +142,12 @@ export function ScenarioModelPanel({ className }: { className?: string }) {
             step="1"
             value={conversionRate}
             onChange={(e) => setConversionRate(Number(e.target.value))}
-            className="w-full accent-brand cursor-pointer"
+            className="rz-slider w-full"
           />
         </div>
 
         <div>
-          <div className="flex justify-between text-inkMuted font-bold mb-1.5">
+          <div className="flex justify-between text-ink-muted font-semibold mb-1.5">
             <span>UPI Gateway Fee</span>
             <span className="text-ink">{feePct.toFixed(1)}%</span>
           </div>
@@ -148,67 +158,71 @@ export function ScenarioModelPanel({ className }: { className?: string }) {
             step="0.5"
             value={feePct}
             onChange={(e) => setFeePct(Number(e.target.value))}
-            className="w-full accent-brand cursor-pointer"
+            className="rz-slider w-full"
           />
         </div>
       </div>
 
-      {/* Projection Outcomes Bento Row */}
+      {/* Outcomes Row */}
       {combined && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 border-t border-borderLight">
-          <div className="p-3.5 rounded-lg bg-canvas border border-border">
-            <span className="text-[10px] font-bold text-inkMuted uppercase block">Avoided RTO Orders</span>
-            <div className="text-2xl font-extrabold text-brand mt-1">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 pt-3 border-t border-line tabular-nums">
+          <div className="p-4 rounded-xl bg-subtle border border-line">
+            <span className="text-xs font-medium text-ink-muted block">Avoided RTO Orders</span>
+            <div className="text-2xl font-bold text-brand mt-1">
               {combined.avoided_rto_shipments.toLocaleString("en-IN")}
             </div>
-            <span className="text-[10px] text-inkMuted mt-0.5 block">
-              Baseline: {combined.baseline_total_rto_shipments} → New: {combined.new_total_rto_shipments}
+            <span className="text-[11px] text-ink-muted mt-0.5 block">
+              Baseline: {combined.baseline_total_rto_shipments} to New: {combined.new_total_rto_shipments}
             </span>
           </div>
 
-          <div className="p-3.5 rounded-lg bg-canvas border border-border">
-            <span className="text-[10px] font-bold text-inkMuted uppercase block">Gross Loss Avoided</span>
-            <div className="text-2xl font-extrabold text-ink mt-1">
+          <div className="p-4 rounded-xl bg-subtle border border-line">
+            <span className="text-xs font-medium text-ink-muted block">Gross Loss Avoided</span>
+            <div className="text-2xl font-bold text-ink mt-1">
               ₹{Number(combined.gross_avoided_loss_inr).toLocaleString("en-IN")}
             </div>
-            <span className="text-[10px] text-inkMuted mt-0.5 block">Pre-incentive savings</span>
+            <span className="text-[11px] text-ink-muted mt-0.5 block">
+              Fees deducted: ₹{Number(combined.total_payment_fees_inr).toLocaleString("en-IN")}
+            </span>
           </div>
 
-          <div className="p-3.5 rounded-lg bg-emerald-50 border border-emerald-200">
-            <span className="text-[10px] font-bold text-emerald-800 uppercase block">Net Monthly Savings</span>
-            <div className="text-2xl font-extrabold text-emerald-700 mt-1">
+          <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+            <span className="text-xs font-medium text-emerald-800 block">Net Monthly Savings</span>
+            <div className="text-2xl font-bold text-emerald-700 mt-1">
               ₹{Number(combined.net_operating_savings_monthly_inr).toLocaleString("en-IN")}
             </div>
-            <span className="text-[10px] text-emerald-800 mt-0.5 block">After incentive payouts</span>
+            <span className="text-[11px] text-emerald-800 mt-0.5 block">
+              After incentives &amp; fees
+            </span>
           </div>
 
-          <div className="p-3.5 rounded-lg bg-brand/10 border border-brand/20">
-            <span className="text-[10px] font-bold text-brand uppercase block">Annualized Net Impact</span>
-            <div className="text-2xl font-extrabold text-brand mt-1">
+          <div className="p-4 rounded-xl bg-brand-soft/60 border border-brand/25">
+            <span className="text-xs font-medium text-brand block">Annualized Net Impact</span>
+            <div className="text-2xl font-bold text-brand mt-1">
               ₹{Number(combined.net_operating_savings_annual_inr).toLocaleString("en-IN")}
             </div>
-            <span className="text-[10px] text-inkMuted mt-0.5 block">12-month projected ROI</span>
+            <span className="text-[11px] text-ink-muted mt-0.5 block">12-month projection</span>
           </div>
         </div>
       )}
 
-      {/* Conservative Case callout */}
       {conservative && (
-        <div className="p-3 rounded-lg bg-surface border border-borderLight flex items-center justify-between text-xs text-inkMuted">
+        <div className="p-3.5 rounded-xl bg-subtle border border-line flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
           <span>
             <strong className="text-ink">Conservative Conversion-Only Floor:</strong> ₹
             {Number(conservative.net_operating_savings_monthly_inr).toLocaleString("en-IN")}/mo (
-            {conservative.avoided_rto_shipments} avoided RTOs from 10% COD conversion alone)
+            {conservative.avoided_rto_shipments} avoided RTOs from {conversionRate.toFixed(0)}% COD
+            conversion alone)
           </span>
-          <span className="text-[10px] font-bold text-brand bg-canvas px-2 py-0.5 rounded border border-border">
+          <span className="text-[11px] font-semibold text-brand bg-surface px-2.5 py-0.5 rounded-full border border-line">
             Robust Margin
           </span>
         </div>
       )}
 
-      {/* Mandatory Claims Compliance Attribution Disclaimer (AGENTS.md §10) */}
-      <p className="text-[10px] text-inkMuted leading-relaxed italic border-t border-borderLight pt-3">
-        * Disclaimer: {data?.disclaimer || "modelled direct operating savings after incentives, before fees — excluding tax, overhead, and other non-delivery costs."}
+      <p className="text-[11px] text-ink-muted leading-relaxed border-t border-line pt-3">
+        {data?.disclaimer ||
+          "modelled direct operating savings after incentives, before fees — excluding tax, overhead, and other non-delivery costs."}
       </p>
     </Card>
   );

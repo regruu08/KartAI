@@ -15,11 +15,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import Settings, get_settings
 from app.data.serviceable_pins import get_pin_metadata
 from app.db.models import DeliveryEventModel, FitLogModel, IncentiveInterventionModel, OrderModel
 from app.db.repositories import OrderRepository, SkuRepository
 from app.db.session import get_db_session
 from app.domain.address import address_quality
+from app.domain.incentive import calculate_incentive_quote
+from app.domain.money import quantize_currency
 from app.domain.risk import evaluate_order_risk
 from app.domain.sizing import recommend_size
 from app.integrations.gemini.normalizer import AddressNormalizer
@@ -29,9 +32,24 @@ from app.schemas.api_contracts import (
     OrderNdrRequest,
     OrderResponse,
     OrderVerifyRequest,
+    PaymentMethodEnum,
 )
+from app.services.catalog_service import CatalogService
 
 router = APIRouter()
+
+
+def _normalize_payment_method(payment_method: str) -> str:
+    """Normalize payment method strictly to canonical 'COD' or 'Prepaid'."""
+    norm = payment_method.strip().upper()
+    if norm == "COD":
+        return PaymentMethodEnum.COD.value
+    if norm == "PREPAID":
+        return PaymentMethodEnum.PREPAID.value
+    raise HTTPException(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        detail=f"Unsupported payment_method '{payment_method}'. Must be 'COD' or 'Prepaid'.",
+    )
 
 
 def _model_to_response(order: OrderModel) -> OrderResponse:
@@ -72,6 +90,7 @@ def _model_to_response(order: OrderModel) -> OrderResponse:
 async def create_order(
     request: OrderCreateRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> OrderResponse:
     """Create a new customer order."""
     sku_repo = SkuRepository(session)
@@ -82,6 +101,7 @@ async def create_order(
             detail=f"SKU '{request.sku_id}' not found in catalog",
         )
 
+    normalized_payment = _normalize_payment_method(request.payment_method)
     order_id = f"ord_{uuid.uuid4().hex[:12]}"
     date_prefix = datetime.now(UTC).strftime("%Y%m%d")
     short_suffix = uuid.uuid4().hex[:6].upper()
@@ -94,7 +114,7 @@ async def create_order(
 
     addr_eval = address_quality(request.street_address, request.pin_code)
     risk_result = evaluate_order_risk(
-        payment_method=request.payment_method,
+        payment_method=normalized_payment,
         street_address=request.street_address,
         pin_code=request.pin_code,
         has_used_fit_twin=request.has_used_fit_twin,
@@ -105,21 +125,60 @@ async def create_order(
     subtotal = item_price * request.quantity
     if request.applied_discount_inr > subtotal:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Applied discount cannot exceed order subtotal.",
         )
-    if request.payment_method.upper() == "COD" and request.applied_discount_inr > Decimal("0.00"):
+    if normalized_payment == PaymentMethodEnum.COD.value and request.applied_discount_inr > Decimal(
+        "0.00"
+    ):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Discounts cannot be applied to Cash on Delivery (COD) orders.",
         )
     if request.applied_discount_inr > Decimal("40.00"):
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Applied discount exceeds maximum allowable incentive limit of ₹40.00.",
         )
     total_inr = max(Decimal("0.00"), subtotal - request.applied_discount_inr)
-    dispatch_priority = "priority" if request.payment_method.upper() == "PREPAID" else "standard"
+    dispatch_priority = (
+        "priority" if normalized_payment == PaymentMethodEnum.PREPAID.value else "standard"
+    )
+
+    # Validate & compute UPI incentive conversion quote before persisting rows
+    fee_decimal = Decimal(str(settings.UPI_GATEWAY_FEE_PCT)) / Decimal("100")
+    conversion_quote = None
+    payment_fees = Decimal("0.00")
+    if (
+        request.applied_discount_inr > Decimal("0.00")
+        and normalized_payment == PaymentMethodEnum.PREPAID.value
+    ):
+        cod_risk_result = evaluate_order_risk(
+            payment_method=PaymentMethodEnum.COD.value,
+            street_address=request.street_address,
+            pin_code=request.pin_code,
+            has_used_fit_twin=request.has_used_fit_twin,
+            is_bracketing=request.is_bracketing,
+        )
+        conversion_quote = calculate_incentive_quote(
+            cart_total_inr=subtotal,
+            risk_score_index=max(40, cod_risk_result.risk_score_index),
+            current_payment=PaymentMethodEnum.COD.value,
+            has_used_fit_twin=request.has_used_fit_twin,
+            upi_gateway_fee_pct=fee_decimal,
+        )
+        if (
+            not conversion_quote.eligible_for_incentive
+            or request.applied_discount_inr > conversion_quote.recommended_discount_inr
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail=(
+                    f"Applied discount ₹{request.applied_discount_inr:.2f} exceeds eligible "
+                    f"margin-safe UPI incentive ₹{conversion_quote.recommended_discount_inr:.2f}."
+                ),
+            )
+        payment_fees = quantize_currency(subtotal * fee_decimal)
 
     order = OrderModel(
         id=order_id,
@@ -132,7 +191,7 @@ async def create_order(
         pin_code=request.pin_code,
         tier=tier,
         address_status=addr_eval.status,
-        payment_method=request.payment_method.upper(),
+        payment_method=normalized_payment,
         order_status="Placed",
         total_inr=total_inr,
         cod_risk_score=risk_result.risk_score_index,
@@ -151,41 +210,46 @@ async def create_order(
         id=f"evt_{uuid.uuid4().hex[:12]}",
         order_id=order_id,
         event_type="Order_Placed",
-        reason=f"Payment: {request.payment_method.upper()}, Total: ₹{total_inr:.2f}",
+        reason=f"Payment: {normalized_payment}, Total: ₹{total_inr:.2f}",
     )
     session.add(initial_event)
 
-    # Track UPI incentive conversion intervention if applicable
-    if (
-        request.applied_discount_inr > Decimal("0.00")
-        and request.payment_method.upper() == "PREPAID"
-    ):
+    # Track UPI incentive conversion intervention via closed-form domain solver
+    if conversion_quote is not None:
+        expected_avoided_loss = conversion_quote.expected_avoided_loss_inr
+        retained_headroom = max(
+            Decimal("0.00"),
+            expected_avoided_loss - request.applied_discount_inr - payment_fees,
+        )
         intervention = IncentiveInterventionModel(
             id=f"int_{uuid.uuid4().hex[:12]}",
             order_id=order_id,
-            original_payment="COD",
+            original_payment=PaymentMethodEnum.COD.value,
             offered_discount_inr=request.applied_discount_inr,
             converted_to_upi=True,
-            expected_savings_inr=Decimal("52.00"),
-            retained_headroom_inr=Decimal("12.00"),
-            reason_code=request.incentive_reason_code or "REASON_ELEVATED_RISK_CONVERTIBLE",
+            expected_savings_inr=expected_avoided_loss,
+            retained_headroom_inr=retained_headroom,
+            reason_code=request.incentive_reason_code or conversion_quote.reason_code,
         )
         session.add(intervention)
 
-    # Record Fit-Twin audit log if shopper used sizing check
-    if request.has_used_fit_twin and request.known_brand and request.known_size:
+    # Record Fit-Twin audit log if shopper used sizing check (using DB SKU measurements)
+    clean_brand = request.known_brand.strip() if request.known_brand else ""
+    clean_size = request.known_size.strip() if request.known_size else ""
+    if request.has_used_fit_twin and clean_brand and clean_size:
         rec = recommend_size(
             sku_id=request.sku_id,
-            known_brand=request.known_brand,
-            known_size=request.known_size,
+            known_brand=clean_brand,
+            known_size=clean_size,
             fit_preference=request.fit_preference or "tailored",
+            custom_catalog=CatalogService.to_sizing_catalog(sku),
         )
         fit_log = FitLogModel(
             id=f"fit_{uuid.uuid4().hex[:12]}",
             sku_id=request.sku_id,
             order_id=order_id,
-            known_brand=request.known_brand,
-            known_size=request.known_size,
+            known_brand=clean_brand,
+            known_size=clean_size,
             recommended_size=rec.recommended_size,
             confidence_level=rec.confidence_level,
             fit_score=rec.fit_score,
@@ -254,6 +318,7 @@ async def verify_order(
     order_id: str,
     request: OrderVerifyRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
 ) -> OrderResponse:
     """Verify delivery landmark and slot from WhatsApp simulator."""
     repo = OrderRepository(session)
@@ -283,13 +348,13 @@ async def verify_order(
     clean_landmark = request.landmark.strip() if request.landmark else None
     if order.address_status in ("NeedsLandmark", "Poor") and not clean_landmark:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Delivery landmark is required to verify this address before dispatch.",
         )
 
     # If landmark provided, run conversational address normalizer
     if clean_landmark:
-        normalizer = AddressNormalizer()
+        normalizer = AddressNormalizer(settings=settings)
         norm_result = await normalizer.normalize(
             raw_address=order.street_address,
             landmark=clean_landmark,

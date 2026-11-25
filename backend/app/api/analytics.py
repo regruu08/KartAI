@@ -83,6 +83,12 @@ async def get_scenario(
         float,
         Query(ge=0.0, le=10.0, description="Payment gateway fee %"),
     ] = 0.0,
+    average_order_value_inr: Annotated[
+        Decimal,
+        Query(
+            ge=Decimal("100.00"), description="Average order value (INR) for gateway fee projection"
+        ),
+    ] = Decimal("1899.00"),
 ) -> ScenarioCalculationResponse:
     """Evaluate financial scenario projections with custom or default parameters."""
     req = ScenarioCalculationRequest(
@@ -95,6 +101,7 @@ async def get_scenario(
         cod_conversion_pct=cod_conversion_pct,
         residual_cod_rto_reduction_pp=residual_cod_rto_reduction_pp,
         upi_gateway_fee_pct=upi_gateway_fee_pct,
+        average_order_value_inr=average_order_value_inr,
     )
     service = AnalyticsService(session)
     return service.calculate_scenario_projection(req)

@@ -114,3 +114,14 @@ async def test_analytics_scenario_custom_overrides(async_client: AsyncClient) ->
     combined = data["combined_case"]
     assert combined["baseline_cod_shipments"] == 3500
     assert combined["baseline_prepaid_shipments"] == 1500
+
+
+@pytest.mark.asyncio
+async def test_analytics_scenario_gateway_fee_deduction(async_client: AsyncClient) -> None:
+    """Verify GET /v1/analytics/scenario wires upi_gateway_fee_pct into fees & net savings."""
+    response = await async_client.get("/v1/analytics/scenario?upi_gateway_fee_pct=1.5")
+    assert response.status_code == 200
+
+    combined = response.json()["combined_case"]
+    assert float(combined["total_payment_fees_inr"]) == 18518.50
+    assert float(combined["net_operating_savings_monthly_inr"]) == 10081.50

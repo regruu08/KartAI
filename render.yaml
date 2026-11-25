@@ -14,8 +14,8 @@ services:
         value: production
       - key: DEMO_MODE
         value: "true"
-      - key: DEMO_RESET_TOKEN
-        value: secret-demo-token-2026
+      - key: DEMO_TOKEN
+        value: returnzero-demo-secret-2026
       - key: PRIMARY_GEMINI_API_KEY
         sync: false
       - key: BACKUP_GEMINI_API_KEY
@@ -23,4 +23,6 @@ services:
       - key: GEMINI_MODEL_ID
         value: gemini-3.8-flash
       - key: CORS_ORIGINS
-        value: "http://localhost:3000,https://returnzero-ai.vercel.app,https://*.vercel.app"
+        value: "http://localhost:3000,https://returnzero-ai.vercel.app"
+      - key: CORS_ORIGIN_REGEX
+        value: "^https://returnzero.*\\.vercel\\.app$"

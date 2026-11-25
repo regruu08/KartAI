@@ -1,16 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  LayoutDashboard,
-  Activity,
-  Sliders,
-  RotateCw,
-  ArrowLeft,
-  Sparkles,
-} from "lucide-react";
+import { motion } from "framer-motion";
+import { Activity, ArrowLeft, RotateCw, Sliders } from "lucide-react";
+import { api } from "@/lib/api/client";
+import type { AnalyticsOverviewResponse, OrderResponse } from "@/lib/api/types";
+import { AnnouncementBar } from "@/components/layout/AnnouncementBar";
+import { Footer } from "@/components/layout/Footer";
 import { Navbar } from "@/components/ui/Navbar";
+import { ErrorBoundary } from "@/components/ui/ErrorBoundary";
 import { OverviewKPIs } from "@/components/dashboard/OverviewKPIs";
 import { OrderStreamTable } from "@/components/dashboard/OrderStreamTable";
 import { TierRtoChart } from "@/components/dashboard/TierRtoChart";
@@ -18,8 +17,7 @@ import { SkuIntelligenceCards } from "@/components/dashboard/SkuIntelligenceCard
 import { ScenarioModelPanel } from "@/components/dashboard/ScenarioModelPanel";
 import { IncentiveEquationCard } from "@/components/dashboard/IncentiveEquationCard";
 import { DemoResetButton } from "@/components/dashboard/DemoResetButton";
-import { api } from "@/lib/api/client";
-import type { AnalyticsOverviewResponse, OrderResponse } from "@/lib/api/types";
+import { cn } from "@/lib/cn";
 
 export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState<"telemetry" | "scenario">("telemetry");
@@ -36,131 +34,200 @@ export default function DashboardPage() {
       ]);
       setOverview(ovRes);
       setOrders(ordRes.orders);
-      setLastRefreshed(new Date().toLocaleTimeString());
+      setLastRefreshed(
+        new Date().toLocaleTimeString("en-IN", {
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+        }),
+      );
     } catch {
-      // Fallback state will be gracefully maintained
+      // Keep last known snapshot gracefully
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    refreshData();
-    // Auto-poll every 5 seconds to catch live order submissions
-    const interval = setInterval(refreshData, 5000);
+    void refreshData();
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void refreshData();
+      }
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
   return (
     <div className="min-h-screen bg-canvas text-ink flex flex-col">
+      <AnnouncementBar />
       <Navbar />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex-1 w-full space-y-6">
+      <main
+        id="main-content"
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 flex-1 w-full space-y-6"
+      >
         {/* Top Control Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-borderLight">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <Link
-                href="/"
-                className="text-xs font-bold text-inkMuted hover:text-ink inline-flex items-center gap-1"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Storefront
-              </Link>
-              <span className="text-border">/</span>
-              <span className="text-xs font-bold text-brand uppercase tracking-wider">
-                Control Center
-              </span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-ink flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-line">
+          <div className="space-y-1.5">
+            <Link
+              href="/"
+              className="text-xs font-semibold text-ink-muted hover:text-ink inline-flex items-center gap-1"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Storefront</span>
+            </Link>
+            <h1 className="font-display text-3xl sm:text-4xl text-ink">
               Merchant Command Center
             </h1>
-            <p className="text-xs text-inkMuted">
-              Live database telemetry separated from financial scenario modeling (ADR-005)
+            <p className="text-xs text-ink-muted">
+              Live synthetic database telemetry separated from 10,000-order financial scenario
+              modeling (ADR-005)
             </p>
           </div>
 
-          {/* Action Toolbar */}
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
+            {lastRefreshed && (
+              <span className="inline-flex items-center gap-2 rounded-full border border-trust/30 bg-trust-soft px-3.5 py-1.5 text-xs font-medium text-trust-text tabular-nums">
+                <span
+                  className="h-2 w-2 rounded-full bg-trust animate-pulse motion-reduce:animate-none"
+                  aria-hidden="true"
+                />
+                <span>Live · {lastRefreshed}</span>
+              </span>
+            )}
+
             <button
               type="button"
-              onClick={refreshData}
-              className="p-2 rounded-lg border border-border bg-surface hover:bg-canvas text-inkMuted hover:text-ink transition-colors text-xs font-semibold flex items-center gap-1.5"
+              onClick={() => void refreshData()}
+              className="min-h-[38px] px-3.5 py-1.5 rounded-full border border-line-strong bg-surface hover:bg-subtle text-ink-muted hover:text-ink transition-colors text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer"
             >
-              <RotateCw className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Refresh</span>
+              <RotateCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} aria-hidden="true" />
+              <span>Refresh</span>
             </button>
-            <DemoResetButton onResetComplete={refreshData} />
+
+            <DemoResetButton onResetComplete={() => void refreshData()} />
           </div>
         </div>
 
-        {/* Tab Toggle: Live Telemetry vs Financial Scenario */}
-        <div className="flex border-b border-borderLight space-x-4">
+        {/* Animated Tab Toggle */}
+        <div role="tablist" aria-label="Dashboard sections" className="flex border-b border-line space-x-6">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "telemetry"}
             onClick={() => setActiveTab("telemetry")}
-            className={`pb-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-all ${
-              activeTab === "telemetry"
-                ? "border-brand text-brand"
-                : "border-transparent text-inkMuted hover:text-ink"
-            }`}
+            className={cn(
+              "relative pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer",
+              activeTab === "telemetry" ? "text-brand" : "text-ink-muted hover:text-ink",
+            )}
           >
-            <Activity className="w-4 h-4" />
-            Live Database Telemetry (150 Orders)
+            <Activity className="w-4 h-4" aria-hidden="true" />
+            <span>Live Database Telemetry ({overview?.total_orders ?? 150} Orders)</span>
+            {activeTab === "telemetry" && (
+              <motion.span
+                layoutId="dashboard-tab-indicator"
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand"
+              />
+            )}
           </button>
+
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "scenario"}
             onClick={() => setActiveTab("scenario")}
-            className={`pb-3 text-xs font-bold flex items-center gap-2 border-b-2 transition-all ${
-              activeTab === "scenario"
-                ? "border-brand text-brand"
-                : "border-transparent text-inkMuted hover:text-ink"
-            }`}
+            className={cn(
+              "relative pb-3 text-xs sm:text-sm font-semibold flex items-center gap-2 transition-colors cursor-pointer",
+              activeTab === "scenario" ? "text-brand" : "text-ink-muted hover:text-ink",
+            )}
           >
-            <Sliders className="w-4 h-4" />
-            10,000-Shipment Financial Scenario Modeler
+            <Sliders className="w-4 h-4" aria-hidden="true" />
+            <span>10,000-Shipment Financial Scenario Modeler</span>
+            {activeTab === "scenario" && (
+              <motion.span
+                layoutId="dashboard-tab-indicator"
+                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-brand"
+              />
+            )}
           </button>
         </div>
 
-        {/* TAB 1: LIVE TELEMETRY */}
-        {activeTab === "telemetry" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            {/* 7 KPI Tiles Row */}
-            {overview && <OverviewKPIs data={overview} />}
+        {activeTab === "telemetry" ? (
+          <motion.div
+            key="telemetry"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
+          >
+            <ErrorBoundary title="KPI strip failed to render">
+              {overview ? (
+                <OverviewKPIs data={overview} />
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3.5" aria-hidden="true">
+                  {Array.from({ length: 7 }).map((_, idx) => (
+                    <div
+                      key={idx}
+                      className="h-24 rounded-2xl border border-line bg-surface p-4 animate-pulse"
+                    />
+                  ))}
+                </div>
+              )}
+            </ErrorBoundary>
 
-            {/* Split Row: Geographic Tier Chart & Incentive Equation */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               <div className="lg:col-span-5">
-                {overview && <TierRtoChart data={overview.tier_breakdown} />}
+                <ErrorBoundary title="Tier RTO chart failed to render">
+                  {overview ? (
+                    <TierRtoChart data={overview.tier_breakdown} />
+                  ) : (
+                    <div className="h-72 rounded-2xl border border-line bg-surface animate-pulse" aria-hidden="true" />
+                  )}
+                </ErrorBoundary>
               </div>
               <div className="lg:col-span-7">
-                <IncentiveEquationCard />
+                <ErrorBoundary title="Incentive equation widget failed to render">
+                  <IncentiveEquationCard />
+                </ErrorBoundary>
               </div>
             </div>
 
-            {/* SKU Pattern Audit & Missing Dimension Alert Cards */}
-            {overview && <SkuIntelligenceCards skus={overview.sku_breakdown} />}
+            <ErrorBoundary title="SKU audit cards failed to render">
+              {overview && <SkuIntelligenceCards skus={overview.sku_breakdown} />}
+            </ErrorBoundary>
 
-            {/* Real-Time Order Stream Table */}
-            <OrderStreamTable orders={orders} />
+            <ErrorBoundary title="Order stream table failed to render">
+              <OrderStreamTable orders={orders} />
+            </ErrorBoundary>
 
-            {/* Telemetry disclaimer */}
             {overview && (
-              <p className="text-[10px] text-center text-inkMuted italic">
-                * {overview.disclaimer}
+              <p className="text-[11px] text-center text-ink-muted">
+                {overview.disclaimer}
               </p>
             )}
-          </div>
-        )}
-
-        {/* TAB 2: FINANCIAL SCENARIO MODELER */}
-        {activeTab === "scenario" && (
-          <div className="space-y-6 animate-in fade-in duration-200">
-            <ScenarioModelPanel />
-            <IncentiveEquationCard />
-          </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="scenario"
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="space-y-6"
+          >
+            <ErrorBoundary title="Scenario modeler failed to render">
+              <ScenarioModelPanel />
+            </ErrorBoundary>
+            <ErrorBoundary title="Incentive equation widget failed to render">
+              <IncentiveEquationCard />
+            </ErrorBoundary>
+          </motion.div>
         )}
       </main>
+
+      <Footer />
     </div>
   );
 }

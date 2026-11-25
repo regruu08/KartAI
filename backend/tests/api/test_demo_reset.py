@@ -47,6 +47,7 @@ async def test_demo_reset_when_demo_mode_disabled() -> None:
     """Verify POST /v1/demo/reset returns 403 when DEMO_MODE is False."""
     prod_settings = Settings(
         ENVIRONMENT="production",
+        DATABASE_URL="sqlite+aiosqlite:///:memory:",
         DEMO_MODE=False,
         DEMO_TOKEN=SecretStr(VALID_DEMO_TOKEN),
     )

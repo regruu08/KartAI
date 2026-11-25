@@ -8,14 +8,50 @@ All secrets must be wrapped in SecretStr. No os.getenv() calls outside this modu
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
+from typing import Final
+from urllib.parse import urlencode
 
-from pydantic import Field, SecretStr
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
+
+BACKEND_DIR: Final[Path] = Path(__file__).resolve().parent.parent
+REPO_ROOT_DIR: Final[Path] = BACKEND_DIR.parent
+
+
+def resolve_database_url(database_url: str, base_dir: Path = BACKEND_DIR) -> str:
+    """Resolve relative SQLite paths deterministically against backend/ directory.
+
+    Ensures launching uvicorn from repo root or backend/ always points to the
+    single canonical backend/returnzero.db file while leaving in-memory, absolute
+    file paths, and PostgreSQL URLs untouched.
+    """
+    raw = database_url.strip()
+    try:
+        parsed = make_url(raw)
+    except ArgumentError:
+        return raw
+
+    if parsed.get_backend_name() != "sqlite":
+        return raw
+
+    db_path = parsed.database
+    if not db_path or db_path == ":memory:" or db_path.startswith("file:"):
+        return raw
+
+    if Path(db_path).is_absolute() or db_path.startswith("/"):
+        return raw
+
+    resolved_path = (base_dir / db_path).resolve()
+    query_suffix = f"?{urlencode(parsed.query, doseq=True)}" if parsed.query else ""
+    return f"{parsed.drivername}:///{resolved_path.as_posix()}{query_suffix}"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(str(REPO_ROOT_DIR / ".env"), str(BACKEND_DIR / ".env")),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -30,6 +66,10 @@ class Settings(BaseSettings):
     CORS_ORIGINS: str = Field(
         default="http://localhost:3000,http://127.0.0.1:3000",
         description="Comma-separated allowed CORS origins",
+    )
+    CORS_ORIGIN_REGEX: str = Field(
+        default=r"^https://returnzero.*\.vercel\.app$",
+        description="Optional regex pattern for allowed preview origins (e.g. Vercel previews)",
     )
 
     # Database Settings (ADR-019: async SQLite default with PostgreSQL compatibility)
@@ -53,7 +93,13 @@ class Settings(BaseSettings):
     )
     GEMINI_TIMEOUT_S: float = Field(
         default=4.0,
+        gt=0.0,
         description="Hard timeout in seconds for Gemini API calls",
+    )
+    EXTRACT_RATE_LIMIT_PER_MIN: int = Field(
+        default=30,
+        ge=1,
+        description="Maximum /extract requests per minute per client IP",
     )
 
     # Demo & Admin Settings (ADR-009)
@@ -69,13 +115,31 @@ class Settings(BaseSettings):
     # Financial / Incentive Solver Settings (ADR-002)
     UPI_GATEWAY_FEE_PCT: float = Field(
         default=0.0,
+        ge=0.0,
+        le=10.0,
         description="Payment gateway fee percentage for UPI (default 0.0 per pitch deck)",
     )
 
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def _normalize_database_url(cls, value: str) -> str:
+        """Resolve relative SQLite file paths deterministically."""
+        return resolve_database_url(value)
+
     @property
     def cors_origins_list(self) -> list[str]:
-        """Parsed list of allowed CORS origins."""
-        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
+        """Parsed list of allowed explicit CORS origins (never wildcard '*')."""
+        return [
+            origin.strip()
+            for origin in self.CORS_ORIGINS.split(",")
+            if origin.strip() and origin.strip() != "*"
+        ]
+
+    @property
+    def cors_origin_regex(self) -> str | None:
+        """Configured CORS origin regex or None if blank."""
+        stripped = self.CORS_ORIGIN_REGEX.strip()
+        return stripped or None
 
     @property
     def has_gemini_key(self) -> bool:

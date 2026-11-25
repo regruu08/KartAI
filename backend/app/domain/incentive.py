@@ -60,6 +60,7 @@ class IncentiveQuoteResult:
     reason_code: str
     nudge_copy: str
     cod_remains_available: bool = True  # Fairness mandate: COD never hard-blocked (ADR-002)
+    expected_avoided_loss_inr: Decimal = ZERO_CURRENCY
 
 
 def calculate_incentive_quote(
@@ -197,4 +198,5 @@ def calculate_incentive_quote(
         reason_code=REASON_ELEVATED_RISK_CONVERTIBLE,
         nudge_copy=nudge,
         cod_remains_available=True,
+        expected_avoided_loss_inr=expected_avoided_loss,
     )

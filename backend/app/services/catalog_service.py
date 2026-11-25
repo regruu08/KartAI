@@ -12,6 +12,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import Settings
 from app.db.models import SkuModel
 from app.db.repositories import SkuRepository
 from app.integrations.gemini.extractor import CatalogExtractor
@@ -50,6 +51,21 @@ class CatalogService:
             image_sha256=model.image_sha256,
         )
 
+    @staticmethod
+    def to_sizing_catalog(sku: SkuModel | SkuResponse) -> dict[str, dict[str, Any]]:
+        """Build a custom_catalog dictionary from a persisted SKU for deterministic sizing."""
+        return {
+            sku.id: {
+                "id": sku.id,
+                "name": sku.name,
+                "fabric_stretch": sku.fabric_stretch,
+                "has_shoulder": sku.has_shoulder,
+                "has_sleeve": sku.has_sleeve,
+                "length_inches": sku.length_inches,
+                "sizes": sku.sizes_json,
+            }
+        }
+
     async def get_sku(self, sku_id: str) -> SkuResponse | None:
         """Retrieve an SKU by its unique ID."""
         model = await self.repo.get_by_id(sku_id)
@@ -68,17 +84,19 @@ class CatalogService:
         sku_id: str,
         request: ExtractCatalogRequest | None = None,
         extractor: CatalogExtractor | None = None,
+        settings: Settings | None = None,
     ) -> SkuResponse | None:
         """Run multimodal extraction for an SKU and persist updated attributes."""
         model = await self.repo.get_by_id(sku_id)
         if not model:
             return None
 
-        active_extractor = extractor or CatalogExtractor()
+        active_extractor = extractor or CatalogExtractor(settings=settings)
+        # Pass empty listing_text when no override provided so CatalogExtractor uses DEFAULT_LISTING_TEXTS
         listing_text = (
-            request.listing_text
-            if request and request.listing_text
-            else f"{model.name}. {model.fabric_composition}."
+            request.listing_text.strip()
+            if request and request.listing_text and request.listing_text.strip()
+            else ""
         )
         image_path = request.image_path if request else None
         force_refresh = request.force_refresh if request else False
@@ -116,9 +134,21 @@ class CatalogService:
                 }
             if sizes_dict:
                 model.sizes_json = sizes_dict
+                # Sync median/M garment length when available
+                m_row = sizes_dict.get("M") or next(iter(sizes_dict.values()), None)
+                if isinstance(m_row, dict) and "length" in m_row:
+                    model.length_inches = float(m_row["length"])
+                # Sync has_shoulder from actual measurements + missing_critical_data
+                any_shoulder = any(
+                    isinstance(dims, dict) and "shoulder" in dims for dims in sizes_dict.values()
+                )
+                model.has_shoulder = any_shoulder and not any(
+                    gap in ("shoulder", "shoulder_width") for gap in extracted.missing_critical_data
+                )
 
-        if "sleeve_length" in extracted.missing_critical_data:
-            model.has_sleeve = False
+        if any(gap in ("shoulder", "shoulder_width") for gap in extracted.missing_critical_data):
+            model.has_shoulder = False
+        model.has_sleeve = "sleeve_length" not in extracted.missing_critical_data
 
         await self.repo.upsert(model)
         await self.session.commit()

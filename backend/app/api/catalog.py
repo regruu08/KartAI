@@ -10,6 +10,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.rate_limit import enforce_extract_rate_limit
+from app.config import Settings, get_settings
 from app.db.session import get_db_session
 from app.domain.sizing import recommend_size
 from app.schemas.api_contracts import (
@@ -66,16 +68,18 @@ async def get_sku(
     response_model=SkuResponse,
     summary="Extract SKU attributes via multimodal VLM",
     description="Run 3-tier extraction flow (cache -> live Gemini -> fixture), persist attributes, and return updated SKU.",
+    dependencies=[Depends(enforce_extract_rate_limit)],
     tags=["Catalog"],
 )
 async def extract_sku(
     sku_id: str,
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
     request: ExtractCatalogRequest | None = None,
 ) -> SkuResponse:
     """Run multimodal extraction for a given SKU and synchronize database state."""
     service = CatalogService(session)
-    sku = await service.extract_and_update(sku_id, request)
+    sku = await service.extract_and_update(sku_id, request, settings=settings)
     if not sku:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -113,6 +117,7 @@ async def compute_sku_fit(
         height_cm=request.height_cm,
         chest_inches=request.chest_inches,
         waist_inches=request.waist_inches,
+        custom_catalog=CatalogService.to_sizing_catalog(sku),
     )
     return FitRecommendationResponse(
         sku_id=recommendation.sku_id,

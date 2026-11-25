@@ -230,3 +230,42 @@ async def test_analytics_repository_live_overview(db_session: AsyncSession) -> N
 
     # Binding disclaimer attribution
     assert "modelled direct operating savings" in overview.disclaimer
+
+
+@pytest.mark.asyncio
+async def test_analytics_repository_case_insensitive_payment_aggregation(
+    db_session: AsyncSession,
+) -> None:
+    """Verify AnalyticsRepository counts uppercase/lowercase legacy payment_method values."""
+    order_repo = OrderRepository(db_session)
+    overview_before = await AnalyticsRepository(db_session).get_live_overview()
+
+    legacy_prepaid = OrderModel(
+        id="RZ-LEGACY-PREPAID",
+        order_number="RZ-LEGACY-PREPAID",
+        customer_name="Legacy Case Shopper",
+        customer_phone="+91 9876543210",
+        street_address="Flat 101, Legacy Towers, Near Metro",
+        city="Delhi",
+        state="Delhi",
+        pin_code="110001",
+        tier="Tier-1",
+        address_status="Complete",
+        payment_method="PREPAID",
+        order_status="Placed",
+        total_inr=Decimal("1859.00"),
+        cod_risk_score=10,
+        discount_applied_inr=Decimal("40.00"),
+        selected_size="L",
+        sku_id="SKU-01",
+        used_fit_check=True,
+        consent_status="opted_in",
+        dispatch_priority="priority",
+        is_synthetic=False,
+    )
+    await order_repo.create(legacy_prepaid)
+    await db_session.commit()
+
+    overview_after = await AnalyticsRepository(db_session).get_live_overview()
+    assert overview_after.total_orders == overview_before.total_orders + 1
+    assert overview_after.prepaid_orders_count == overview_before.prepaid_orders_count + 1

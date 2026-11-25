@@ -63,3 +63,17 @@ class TestFinancialScenarioParity:
         scenario = calculate_scenario()
         assert "modelled direct operating savings" in scenario.disclaimer
         assert scenario.disclaimer == SAVINGS_DISCLAIMER
+
+    def test_scenario_deducts_gateway_fees_when_nonzero(self) -> None:
+        """Gateway fee > 0% deducts fees per converted UPI order from net savings."""
+        scenario = calculate_scenario(
+            upi_gateway_fee_pct=Decimal("0.015"),
+            average_order_value_inr=Decimal("1899.00"),
+        )
+        comb = scenario.combined_scenario
+        # 650 converted orders * round(1899 * 0.015 = 28.49) = 18518.50
+        assert comb.payment_fees_inr == Decimal("18518.50")
+        assert comb.monthly_direct_net_savings_inr == (
+            comb.gross_avoided_cost_inr - comb.incentives_paid_inr - comb.payment_fees_inr
+        )
+        assert comb.monthly_direct_net_savings_inr == Decimal("10081.50")

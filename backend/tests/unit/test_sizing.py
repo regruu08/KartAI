@@ -268,3 +268,78 @@ class TestDeterminism:
                 sku_id="SKU-01", known_brand="Zara", known_size="M", fit_preference="tailored"
             )
             assert rec1 == rec2
+
+
+class TestNewBrandsAndFixtureAlignment:
+    """Verifies calibrated Levi's & Marks & Spencer matrices and SKU-01 fixture parity."""
+
+    @pytest.mark.parametrize("brand", ["Levi's", "levi's", "Marks & Spencer", "m&s"])
+    def test_calibrated_new_brands_recognized_without_fallback_warning(self, brand: str) -> None:
+        rec = recommend_size(
+            sku_id="SKU-02",
+            known_brand=brand,
+            known_size="M",
+            fit_preference="tailored",
+        )
+        assert not any("not in verified conversion matrix" in w for w in rec.missing_data_warnings)
+        assert rec.recommended_size in ("M", "L")
+
+    def test_xxl_size_supported_across_all_brands(self) -> None:
+        for brand in ["Zara", "H&M", "Uniqlo", "Levi's", "Marks & Spencer"]:
+            rec = recommend_size(sku_id="SKU-03", known_brand=brand, known_size="XXL")
+            assert not any(
+                "not in verified conversion matrix" in w for w in rec.missing_data_warnings
+            )
+            assert rec.recommended_size == "XL"
+
+    def test_sku_01_fixture_preserves_zara_m_to_size_l_invariant(self) -> None:
+        from app.integrations.gemini.extractor import CatalogExtractor
+
+        attrs = CatalogExtractor().load_fixture("SKU-01")
+        custom_catalog = {
+            "SKU-01": {
+                "id": "SKU-01",
+                "name": attrs.garment_type,
+                "fabric_stretch": attrs.stretch_category,
+                "has_shoulder": True,
+                "has_sleeve": True,
+                "length_inches": 47.0,
+                "sizes": {
+                    m.size_label: {
+                        "chest": m.chest_inches,
+                        "waist": m.waist_inches,
+                        "shoulder": m.shoulder_inches,
+                        "length": m.length_inches,
+                    }
+                    for m in attrs.measurements_table
+                },
+            }
+        }
+        rec = recommend_size(
+            sku_id="SKU-01",
+            known_brand="Zara",
+            known_size="M",
+            fit_preference="tailored",
+            custom_catalog=custom_catalog,
+        )
+        assert rec.recommended_size == "L"
+
+    def test_unknown_stretch_caps_confidence_at_medium(self) -> None:
+        """Unknown fabric stretch must never yield High confidence per ADR-004."""
+        unknown_stretch_sku = {
+            "name": "Mystery Weave Kurta",
+            "fabric_stretch": "unknown",
+            "has_shoulder": True,
+            "has_sleeve": True,
+            "sizes": {
+                "M": {"chest": 40.0, "waist": 34.0, "shoulder": 17.5},
+                "L": {"chest": 42.0, "waist": 36.0, "shoulder": 18.5},
+            },
+        }
+        rec = recommend_size(
+            sku_id="UNK-STRETCH",
+            known_brand="Zara",
+            known_size="M",
+            custom_catalog={"UNK-STRETCH": unknown_stretch_sku},
+        )
+        assert rec.confidence_level in ("Medium", "Low (Insufficient Data)")

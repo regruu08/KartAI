@@ -21,6 +21,7 @@ from typing import Any
 from PIL import Image
 from pydantic import ValidationError
 
+from app.config import Settings
 from app.domain.sizing import CURATED_SKUS
 from app.integrations.gemini.adapter import (
     CatalogExtractorProtocol,
@@ -38,6 +39,7 @@ from app.integrations.gemini.prompts import (
 from app.schemas.api_contracts import (
     ExtractedCatalogAttributes,
     GarmentMeasurements,
+    GeminiCatalogExtractionPayload,
     ProvenanceEnum,
 )
 
@@ -50,10 +52,10 @@ DEFAULT_LISTING_TEXTS: dict[str, str] = {
     "SKU-01": (
         "Handcrafted Chanderi Silk Anarkali Kurta. 100% Chanderi Silk, zero-stretch (0% elastane), "
         "structured bodice, 180 GSM. Concealed side zipper. Size chart: "
-        "S: Bust 36, Waist 32, Hip 40, Shoulder 14.5, Length 48. "
-        "M: Bust 38, Waist 34, Hip 42, Shoulder 15.0, Length 48. "
-        "L: Bust 40, Waist 36, Hip 44, Shoulder 15.5, Length 48. "
-        "XL: Bust 42, Waist 38, Hip 46, Shoulder 16.0, Length 48."
+        "S: Bust 36, Waist 32, Hip 40, Shoulder 14.5, Length 46. "
+        "M: Bust 38, Waist 34, Hip 42, Shoulder 15.5, Length 47. "
+        "L: Bust 40, Waist 36, Hip 44, Shoulder 17.0, Length 48. "
+        "XL: Bust 42, Waist 38, Hip 46, Shoulder 18.0, Length 49."
     ),
     "SKU-02": (
         "Relaxed Mandarin Collar Linen Shirt. 70% Cotton / 30% Linen, slight natural give, relaxed drape, "
@@ -128,8 +130,9 @@ class CatalogExtractor(CatalogExtractorProtocol):
         adapter: GeminiAdapter | None = None,
         cache: CatalogCache | None = None,
         fixtures_dir: Path | None = None,
+        settings: Settings | None = None,
     ) -> None:
-        self.adapter = adapter if adapter is not None else GeminiAdapter()
+        self.adapter = adapter if adapter is not None else GeminiAdapter(settings=settings)
         self.cache = cache if cache is not None else get_catalog_cache()
         self.fixtures_dir = fixtures_dir if fixtures_dir is not None else FIXTURES_DIR
 
@@ -243,13 +246,13 @@ class CatalogExtractor(CatalogExtractorProtocol):
             raw_text, tier_used = await self.adapter.generate_content(
                 contents=contents,
                 system_instruction=CATALOG_EXTRACTION_SYSTEM_PROMPT,
-                response_schema=ExtractedCatalogAttributes,
+                response_schema=GeminiCatalogExtractionPayload,
                 temperature=0.1,
             )
 
-            # Validate structured output
+            # Validate structured output using tightened garment schema
             try:
-                result = ExtractedCatalogAttributes.model_validate_json(raw_text)
+                parsed_payload = GeminiCatalogExtractionPayload.model_validate_json(raw_text)
             except (ValidationError, ValueError, json.JSONDecodeError) as parse_err:
                 logger.warning(
                     "[TIER 2 PARSE RETRY] Invalid JSON from %s (%s). Attempting repair.",
@@ -264,15 +267,18 @@ class CatalogExtractor(CatalogExtractorProtocol):
                 repaired_text, _ = await self.adapter.generate_content(
                     contents=repair_contents,
                     system_instruction=CATALOG_REPAIR_SYSTEM_PROMPT,
-                    response_schema=ExtractedCatalogAttributes,
+                    response_schema=GeminiCatalogExtractionPayload,
                     temperature=0.1,
                 )
-                result = ExtractedCatalogAttributes.model_validate_json(repaired_text)
+                parsed_payload = GeminiCatalogExtractionPayload.model_validate_json(repaired_text)
 
-            # Tag live attributes
-            result.provenance = ProvenanceEnum.LIVE_GEMINI.value
-            result.extracted_at = datetime.now(UTC)
-            result.prompt_version = PROMPT_VERSION
+            # Construct server-authoritative attributes with provenance metadata
+            result = ExtractedCatalogAttributes(
+                **parsed_payload.model_dump(),
+                provenance=ProvenanceEnum.LIVE_GEMINI.value,
+                extracted_at=datetime.now(UTC),
+                prompt_version=PROMPT_VERSION,
+            )
 
             # Store in cache
             self.cache.set(cache_key, result)

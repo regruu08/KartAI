@@ -121,6 +121,36 @@ class GarmentMeasurements(BaseModel):
     )
 
 
+class GeminiCatalogExtractionPayload(BaseModel):
+    """Tightened LLM output schema excluding server-assigned provenance/timestamp metadata."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    garment_type: str = Field(description="e.g. Kurta, Shirt, Trucker Jacket, Maxi Dress")
+    silhouette: Literal[
+        "structured_fitted", "regular_straight", "relaxed_boxy", "fluid_oversized"
+    ] = Field(description="Garment structural silhouette")
+    stretch_category: Literal[
+        "non_stretch", "slight_stretch", "medium_stretch", "high_stretch", "unknown"
+    ] = Field(description="Fabric stretch classification")
+    stated_fabric: str | None = Field(
+        default=None, description="Fabric stated in listing text, e.g. 100% Chanderi Silk"
+    )
+    visible_closure: str | None = Field(
+        default=None, description="e.g. Button placket, side zipper, smocked elastic"
+    )
+    measurements_table: list[GarmentMeasurements] = Field(
+        default_factory=list, description="Array of size-wise garment dimensions"
+    )
+    missing_critical_data: list[str] = Field(
+        default_factory=list,
+        description="List of unstated physical attributes, e.g. ['sleeve_length']",
+    )
+    drape_notes: str = Field(
+        description="Objective observation of garment fall, stiffness, and drape"
+    )
+
+
 class ExtractedCatalogAttributes(BaseModel):
     """Multimodal extracted catalog intelligence from Gemini VLM or benchmark fixture."""
 
@@ -178,6 +208,19 @@ class ExtractCatalogRequest(BaseModel):
 
 
 # --- Address Normalization Schemas ---
+
+
+class GeminiAddressNormalizationPayload(BaseModel):
+    """Tightened LLM address normalization payload excluding server provenance metadata."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    sanitized_address: str = Field(description="Standardized title-cased address string")
+    landmark: str | None = Field(default=None, description="Extracted and formatted landmark")
+    delivery_instructions: str = Field(
+        description="Actionable last-mile instructions for delivery rider"
+    )
+    confidence: str = Field(default="high", description="Normalization confidence: high | medium")
 
 
 class NormalizedAddressResult(BaseModel):
@@ -267,7 +310,11 @@ class AnalyticsOverviewResponse(BaseModel):
     active_orders_count: int = Field(description="Orders currently in transit or verification")
     converted_to_upi_count: int = Field(description="COD orders converted to UPI via incentive")
     estimated_direct_savings_inr: Decimal = Field(
-        description="Estimated direct savings from converted COD orders"
+        description="Gross avoided courier RTO loss from converted COD orders (SUM of expected_savings_inr)"
+    )
+    net_direct_savings_inr: Decimal = Field(
+        default=Decimal("0.00"),
+        description="Net retained direct savings after incentives and fees (SUM of retained_headroom_inr)",
     )
     total_incentives_disbursed_inr: Decimal = Field(
         description="Cumulative UPI conversion discounts disbursed"
@@ -308,6 +355,11 @@ class ScenarioCalculationRequest(BaseModel):
     )
     upi_gateway_fee_pct: float = Field(
         default=0.0, ge=0.0, le=10.0, description="Payment gateway fee %"
+    )
+    average_order_value_inr: Decimal = Field(
+        default=Decimal("1899.00"),
+        ge=Decimal("100.00"),
+        description="Average order value (INR) used for gateway fee projection",
     )
 
 
@@ -377,7 +429,8 @@ class FitRecommendRequest(BaseModel):
 
     sku_id: str = Field(default="", description="Target catalog SKU identifier, e.g. SKU-01")
     known_brand: str = Field(
-        min_length=1, description="Shopper reference brand: Zara | H&M | Uniqlo"
+        min_length=1,
+        description="Shopper reference brand: Zara | H&M | Uniqlo | Levi's | Marks & Spencer",
     )
     known_size: str = Field(
         min_length=1, description="Shopper reference size: XS, S, M, L, XL, XXL, 32, 34..."
@@ -499,7 +552,13 @@ class IncentiveQuoteResponse(BaseModel):
         description="Whether order qualifies for instant UPI discount"
     )
     recommended_discount_inr: Decimal = Field(description="Margin-safe discount amount in INR")
-    expected_savings_inr: Decimal = Field(description="Expected merchant loss avoided")
+    expected_avoided_loss_inr: Decimal = Field(
+        default=Decimal("0.00"),
+        description="Gross avoided RTO loss before discount and gateway fees",
+    )
+    expected_savings_inr: Decimal = Field(
+        description="Net direct operational savings retained after discount and fees"
+    )
     headroom_inr: Decimal = Field(description="Retained margin headroom after discount")
     reason_code: str = Field(description="Decision reason code")
     nudge_copy: str = Field(description="State-conditioned shopper nudge copy")

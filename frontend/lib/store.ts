@@ -20,12 +20,19 @@ export interface CartItem {
   fitPreference?: string;
 }
 
+export interface ScopedFitInput {
+  brand: BrandName;
+  size: SizeLabel;
+  preference: FitPreference;
+  heightCm: number;
+}
+
 interface StoreState {
   /* Catalog */
   selectedSku: SkuResponse | null;
   setSelectedSku: (sku: SkuResponse | null) => void;
 
-  /* Fit Twin */
+  /* Fit Twin (scoped per SKU + active drawer defaults) */
   fitDrawerOpen: boolean;
   openFitDrawer: () => void;
   closeFitDrawer: () => void;
@@ -39,6 +46,13 @@ interface StoreState {
   setHeightCm: (h: number) => void;
   fitResult: FitRecommendationResponse | null;
   setFitResult: (result: FitRecommendationResponse | null) => void;
+  fitBySku: Record<string, FitRecommendationResponse>;
+  fitInputsBySku: Record<string, ScopedFitInput>;
+  setFitForSku: (
+    skuId: string,
+    result: FitRecommendationResponse | null,
+    input?: ScopedFitInput,
+  ) => void;
 
   /* Cart */
   cart: CartItem[];
@@ -84,7 +98,33 @@ export const useStore = create<StoreState>((set) => ({
   heightCm: 165,
   setHeightCm: (h) => set({ heightCm: h }),
   fitResult: null,
-  setFitResult: (result) => set({ fitResult: result }),
+  setFitResult: (result) =>
+    set((state) => ({
+      fitResult: result,
+      fitBySku:
+        result && result.sku_id
+          ? { ...state.fitBySku, [result.sku_id]: result }
+          : state.fitBySku,
+    })),
+  fitBySku: {},
+  fitInputsBySku: {},
+  setFitForSku: (skuId, result, input) =>
+    set((state) => {
+      const nextFitBySku = { ...state.fitBySku };
+      if (result) {
+        nextFitBySku[skuId] = result;
+      } else {
+        delete nextFitBySku[skuId];
+      }
+      const nextInputs = input
+        ? { ...state.fitInputsBySku, [skuId]: input }
+        : state.fitInputsBySku;
+      return {
+        fitResult: result,
+        fitBySku: nextFitBySku,
+        fitInputsBySku: nextInputs,
+      };
+    }),
 
   cart: [],
   addToCart: (item) =>

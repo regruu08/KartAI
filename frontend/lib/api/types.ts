@@ -113,6 +113,7 @@ export interface AnalyticsOverviewResponse {
   active_orders_count: number;
   converted_to_upi_count: number;
   estimated_direct_savings_inr: number | string;
+  net_direct_savings_inr?: number | string;
   total_incentives_disbursed_inr: number | string;
   tier_breakdown: TierRtoStat[];
   sku_breakdown: SkuMetricStat[];
@@ -154,6 +155,7 @@ export interface IncentiveQuoteRequest {
 export interface IncentiveQuoteResponse {
   eligible_for_incentive: boolean;
   recommended_discount_inr: number | string;
+  expected_avoided_loss_inr?: number | string;
   expected_savings_inr: number | string;
   headroom_inr: number | string;
   reason_code: string;
@@ -250,5 +252,5 @@ export interface ScenarioCalculationResponse {
 }
 
 export type FitPreference = "tight" | "tailored" | "relaxed" | "oversized";
-export type BrandName = "Zara" | "H&M" | "Uniqlo";
+export type BrandName = "Zara" | "H&M" | "Uniqlo" | "Levi's" | "Marks & Spencer";
 export type SizeLabel = "XS" | "S" | "M" | "L" | "XL" | "XXL";

@@ -50,8 +50,8 @@ async def test_healthcheck_with_configured_gemini_key() -> None:
 
 
 @pytest.mark.asyncio
-async def test_app_lifespan() -> None:
+async def test_app_lifespan(test_settings: Settings) -> None:
     """Verify application lifespan startup and shutdown routines."""
-    app = create_app()
+    app = create_app(test_settings)
     async with app.router.lifespan_context(app):
         pass

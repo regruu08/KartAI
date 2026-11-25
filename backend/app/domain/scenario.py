@@ -29,6 +29,8 @@ DEFAULT_INCENTIVE_PER_ORDER: Final[Decimal] = Decimal("40.00")  # ₹40 incentiv
 DEFAULT_RESIDUAL_COD_IMPROVEMENT_PP: Final[Decimal] = Decimal(
     "0.02"
 )  # 2 pp improvement from delivery assurance
+DEFAULT_UPI_GATEWAY_FEE_PCT: Final[Decimal] = Decimal("0.0")
+DEFAULT_SCENARIO_AOV: Final[Decimal] = Decimal("1899.00")
 
 SAVINGS_DISCLAIMER: Final[str] = (
     "modelled direct operating savings after incentives, before fees — "
@@ -56,6 +58,7 @@ class ScenarioProjection:
     monthly_direct_net_savings_inr: Decimal
     annual_direct_net_savings_inr: Decimal
     label: str
+    payment_fees_inr: Decimal = Decimal("0.00")
 
 
 @dataclass(frozen=True)
@@ -84,6 +87,8 @@ def calculate_scenario(
     cod_to_prepaid_shift_pct: Decimal | int | str = DEFAULT_COD_CONVERSION_RATE,
     incentive_per_order: Decimal | int | str = DEFAULT_INCENTIVE_PER_ORDER,
     residual_cod_rto_improvement_pp: Decimal | int | str = DEFAULT_RESIDUAL_COD_IMPROVEMENT_PP,
+    upi_gateway_fee_pct: Decimal | int | str = DEFAULT_UPI_GATEWAY_FEE_PCT,
+    average_order_value_inr: Decimal | int | str = DEFAULT_SCENARIO_AOV,
 ) -> ScenarioResult:
     """Calculate 10,000-shipment financial projection with pitch deck parity.
 
@@ -96,6 +101,8 @@ def calculate_scenario(
     shift_pct = to_decimal(cod_to_prepaid_shift_pct)
     incentive_amt = to_decimal(incentive_per_order)
     residual_pp = to_decimal(residual_cod_rto_improvement_pp)
+    fee_pct = to_decimal(upi_gateway_fee_pct)
+    aov = to_decimal(average_order_value_inr)
 
     # 1. Baseline Calculations
     base_cod_shipments = int(Decimal(str(monthly_shipments)) * cod_share)
@@ -106,10 +113,12 @@ def calculate_scenario(
     base_total_rto = base_cod_rto + base_prepaid_rto
     base_cost = quantize_currency(Decimal(str(base_total_rto)) * cost_per_rto)
 
-    # 2. Converted Cohorts
+    # 2. Converted Cohorts & Gateway Fees
     converted_shipments = int(Decimal(str(base_cod_shipments)) * shift_pct)
     remaining_cod_shipments = base_cod_shipments - converted_shipments
     new_prepaid_shipments = base_prepaid_shipments + converted_shipments
+    per_order_fee = quantize_currency(aov * fee_pct) if fee_pct > Decimal("0") else Decimal("0.00")
+    total_payment_fees = quantize_currency(Decimal(str(converted_shipments)) * per_order_fee)
 
     # 3. Combined Scenario (Conversion + 2pp residual COD RTO improvement from delivery assurance)
     combined_cod_rate = max(Decimal("0.00"), cod_rto_rate - residual_pp)
@@ -120,7 +129,7 @@ def calculate_scenario(
 
     combined_gross = quantize_currency(Decimal(str(combined_avoided)) * cost_per_rto)
     combined_incentives = quantize_currency(Decimal(str(converted_shipments)) * incentive_amt)
-    combined_monthly_net = combined_gross - combined_incentives
+    combined_monthly_net = combined_gross - combined_incentives - total_payment_fees
     combined_annual_net = quantize_currency(combined_monthly_net * Decimal("12"))
 
     combined_proj = ScenarioProjection(
@@ -136,6 +145,7 @@ def calculate_scenario(
         monthly_direct_net_savings_inr=combined_monthly_net,
         annual_direct_net_savings_inr=combined_annual_net,
         label="Combined Scenario (COD-to-Prepaid Conversion + Delivery Assurance)",
+        payment_fees_inr=total_payment_fees,
     )
 
     # 4. Conservative Scenario (Conversion-only, residual COD RTO remains baseline 26%)
@@ -146,7 +156,7 @@ def calculate_scenario(
 
     conservative_gross = quantize_currency(Decimal(str(conservative_avoided)) * cost_per_rto)
     conservative_incentives = quantize_currency(Decimal(str(converted_shipments)) * incentive_amt)
-    conservative_monthly_net = conservative_gross - conservative_incentives
+    conservative_monthly_net = conservative_gross - conservative_incentives - total_payment_fees
     conservative_annual_net = quantize_currency(conservative_monthly_net * Decimal("12"))
 
     conservative_proj = ScenarioProjection(
@@ -162,6 +172,7 @@ def calculate_scenario(
         monthly_direct_net_savings_inr=conservative_monthly_net,
         annual_direct_net_savings_inr=conservative_annual_net,
         label="Conservative Scenario (Conversion-Only, No Residual COD Improvement)",
+        payment_fees_inr=total_payment_fees,
     )
 
     return ScenarioResult(
