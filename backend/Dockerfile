@@ -42,6 +42,9 @@ COPY --from=builder /install /usr/local
 # Copy application source
 COPY --chown=appuser:appgroup app /app/app
 
+# Ensure /app is writable by appuser so SQLite can create returnzero.db and WAL files
+RUN chown appuser:appgroup /app
+
 USER appuser
 
 EXPOSE 8000
